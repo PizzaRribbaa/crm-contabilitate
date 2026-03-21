@@ -1,0 +1,7 @@
+node_modules/
+db/*.sqlite
+db/*.db
+uploads/
+generated/
+.env
+.claude/

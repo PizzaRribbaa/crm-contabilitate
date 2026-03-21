@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - Clienti</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>CRM</h1>
+            <p>Gestiune Contracte & Acces</p>
+        </div>
+        <nav>
+            <a href="/"><span class="icon">&#9776;</span> Dashboard</a>
+            <a href="/contracts.html"><span class="icon">&#128196;</span> Contracte</a>
+            <a href="/spv.html"><span class="icon">&#128273;</span> Acces SPV + 150</a>
+            <a href="/generate.html"><span class="icon">&#128424;</span> Generare Contract</a>
+            <a href="/clients.html" class="active"><span class="icon">&#128101;</span> Clienti</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h2>Clienti</h2>
+            <p>Gestioneaza baza de clienti</p>
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="toolbar">
+            <input type="text" class="search-box" id="searchBox" placeholder="Cauta dupa denumire sau CUI...">
+            <button class="btn btn-primary" onclick="openModal()">+ Adauga Client</button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Denumire</th>
+                                <th>CUI</th>
+                                <th>Adresa</th>
+                                <th>Reprezentant Legal</th>
+                                <th>Telefon</th>
+                                <th>Actiuni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">Adauga Client</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="clientForm" onsubmit="saveClient(event)">
+                <input type="hidden" id="clientId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Denumire <span class="required">*</span></label>
+                        <input type="text" id="denumire" required>
+                    </div>
+                    <div class="form-group">
+                        <label>CUI <span class="required">*</span></label>
+                        <input type="text" id="cui" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nr. Reg. Comert</label>
+                    <input type="text" id="nr_reg_comert">
+                </div>
+                <div class="form-group">
+                    <label>Adresa <span class="required">*</span></label>
+                    <input type="text" id="adresa" required>
+                </div>
+                <div class="form-group">
+                    <label>Reprezentant Legal <span class="required">*</span></label>
+                    <input type="text" id="reprezentant_legal" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefon</label>
+                        <input type="text" id="telefon">
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding:16px 0 0;border-top:1px solid var(--gray-200);margin-top:8px">
+                    <button type="button" class="btn" onclick="closeModal()">Anuleaza</button>
+                    <button type="submit" class="btn btn-primary">Salveaza</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+let clients = [];
+
+async function loadClients() {
+    const search = document.getElementById('searchBox').value;
+    const url = search ? `/api/clients?search=${encodeURIComponent(search)}` : '/api/clients';
+    clients = await API.get(url);
+    renderTable();
+}
+
+function renderTable() {
+    const tbody = document.getElementById('clientsTable');
+    if (clients.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>Niciun client gasit</p></td></tr>';
+        return;
+    }
+    tbody.innerHTML = clients.map(c => `
+        <tr>
+            <td><strong>${c.denumire}</strong></td>
+            <td>${c.cui}</td>
+            <td class="text-sm">${c.adresa}</td>
+            <td>${c.reprezentant_legal}</td>
+            <td>${c.telefon || '-'}</td>
+            <td class="actions">
+                <button class="btn btn-sm" onclick="editClient(${c.id})">Editeaza</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteClient(${c.id}, '${c.denumire.replace(/'/g, "\\'")}')">Sterge</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openModal(client = null) {
+    document.getElementById('modal').classList.add('active');
+    document.getElementById('modalTitle').textContent = client ? 'Editeaza Client' : 'Adauga Client';
+    if (client) {
+        document.getElementById('clientId').value = client.id;
+        document.getElementById('denumire').value = client.denumire;
+        document.getElementById('cui').value = client.cui;
+        document.getElementById('nr_reg_comert').value = client.nr_reg_comert || '';
+        document.getElementById('adresa').value = client.adresa;
+        document.getElementById('reprezentant_legal').value = client.reprezentant_legal;
+        document.getElementById('email').value = client.email || '';
+        document.getElementById('telefon').value = client.telefon || '';
+    } else {
+        document.getElementById('clientForm').reset();
+        document.getElementById('clientId').value = '';
+    }
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('active');
+}
+
+async function editClient(id) {
+    const client = await API.get(`/api/clients/${id}`);
+    openModal(client);
+}
+
+async function saveClient(e) {
+    e.preventDefault();
+    const id = document.getElementById('clientId').value;
+    const data = {
+        denumire: document.getElementById('denumire').value,
+        cui: document.getElementById('cui').value,
+        nr_reg_comert: document.getElementById('nr_reg_comert').value,
+        adresa: document.getElementById('adresa').value,
+        reprezentant_legal: document.getElementById('reprezentant_legal').value,
+        email: document.getElementById('email').value,
+        telefon: document.getElementById('telefon').value
+    };
+    try {
+        if (id) {
+            await API.put(`/api/clients/${id}`, data);
+            showAlert(document.getElementById('alerts'), 'Client actualizat cu succes', 'success');
+        } else {
+            await API.post('/api/clients', data);
+            showAlert(document.getElementById('alerts'), 'Client adaugat cu succes', 'success');
+        }
+        closeModal();
+        loadClients();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+}
+
+async function deleteClient(id, name) {
+    if (!confirm(`Sigur doriti sa stergeti clientul "${name}"?`)) return;
+    try {
+        await API.delete(`/api/clients/${id}`);
+        showAlert(document.getElementById('alerts'), 'Client sters', 'success');
+        loadClients();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+}
+
+document.getElementById('searchBox').addEventListener('input', () => {
+    clearTimeout(window._searchTimer);
+    window._searchTimer = setTimeout(loadClients, 300);
+});
+
+loadClients();
+</script>
+</body>
+</html>

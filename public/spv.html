@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - Acces SPV + 150</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>CRM</h1>
+            <p>Gestiune Contracte & Acces</p>
+        </div>
+        <nav>
+            <a href="/"><span class="icon">&#9776;</span> Dashboard</a>
+            <a href="/contracts.html"><span class="icon">&#128196;</span> Contracte</a>
+            <a href="/spv.html" class="active"><span class="icon">&#128273;</span> Acces SPV + 150</a>
+            <a href="/generate.html"><span class="icon">&#128424;</span> Generare Contract</a>
+            <a href="/clients.html"><span class="icon">&#128101;</span> Clienti</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h2>Evidenta Acces SPV + 150</h2>
+            <p>Gestioneaza datele de acces SPV si Declaratia 150</p>
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="toolbar">
+            <input type="text" class="search-box" id="searchBox" placeholder="Cauta dupa client sau CUI...">
+            <select id="tipFilter" style="width:auto;min-width:120px">
+                <option value="toate">Toate</option>
+                <option value="SPV">SPV</option>
+                <option value="150">150</option>
+            </select>
+            <button class="btn btn-primary" onclick="openModal()">+ Adauga Acces</button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>CUI</th>
+                                <th>Tip</th>
+                                <th>Utilizator</th>
+                                <th>Parola</th>
+                                <th>Status</th>
+                                <th>Data Acces</th>
+                                <th>Observatii</th>
+                                <th>Actiuni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="spvTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">Adauga Acces</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="spvForm" onsubmit="saveAccess(event)">
+                <input type="hidden" id="accessId">
+                <div class="form-group">
+                    <label>Client <span class="required">*</span></label>
+                    <select id="client_id" required>
+                        <option value="">Selecteaza clientul...</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tip Acces <span class="required">*</span></label>
+                        <select id="tip_acces" required>
+                            <option value="SPV">SPV</option>
+                            <option value="150">150</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="status">
+                            <option value="activ">Activ</option>
+                            <option value="inactiv">Inactiv</option>
+                            <option value="expirat">Expirat</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Utilizator</label>
+                        <input type="text" id="utilizator">
+                    </div>
+                    <div class="form-group">
+                        <label>Parola</label>
+                        <input type="text" id="parola">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data Acces</label>
+                    <input type="date" id="data_acces">
+                </div>
+                <div class="form-group">
+                    <label>Observatii</label>
+                    <textarea id="observatii" rows="3"></textarea>
+                </div>
+                <div class="modal-footer" style="padding:16px 0 0;border-top:1px solid var(--gray-200);margin-top:8px">
+                    <button type="button" class="btn" onclick="closeModal()">Anuleaza</button>
+                    <button type="submit" class="btn btn-primary">Salveaza</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+let passwordVisible = {};
+
+async function loadAccess() {
+    const search = document.getElementById('searchBox').value;
+    const tip = document.getElementById('tipFilter').value;
+    let url = `/api/spv?tip=${tip}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const records = await API.get(url);
+    const tbody = document.getElementById('spvTable');
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>Niciun acces inregistrat</p></td></tr>';
+        return;
+    }
+    tbody.innerHTML = records.map(r => `
+        <tr>
+            <td><strong>${r.denumire}</strong></td>
+            <td>${r.cui}</td>
+            <td>${badgeHtml(r.tip_acces, r.tip_acces.toLowerCase())}</td>
+            <td>${r.utilizator || '-'}</td>
+            <td>
+                <span id="pwd-${r.id}">${passwordVisible[r.id] ? (r.parola || '-') : '********'}</span>
+                ${r.parola ? `<button class="btn btn-sm btn-icon" onclick="togglePwd(${r.id}, '${(r.parola || '').replace(/'/g, "\\'")}')" style="margin-left:4px">&#128065;</button>` : ''}
+            </td>
+            <td>${statusBadge(r.status)}</td>
+            <td>${formatDate(r.data_acces)}</td>
+            <td class="text-sm">${r.observatii || '-'}</td>
+            <td class="actions">
+                <button class="btn btn-sm" onclick="editAccess(${r.id})">Editeaza</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteAccess(${r.id})">Sterge</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function togglePwd(id, pwd) {
+    passwordVisible[id] = !passwordVisible[id];
+    document.getElementById(`pwd-${id}`).textContent = passwordVisible[id] ? pwd : '********';
+}
+
+async function loadClients() {
+    const clients = await API.get('/api/clients');
+    const sel = document.getElementById('client_id');
+    sel.innerHTML = '<option value="">Selecteaza clientul...</option>' +
+        clients.map(c => `<option value="${c.id}">${c.denumire} (${c.cui})</option>`).join('');
+}
+
+function openModal(record = null) {
+    document.getElementById('modal').classList.add('active');
+    document.getElementById('modalTitle').textContent = record ? 'Editeaza Acces' : 'Adauga Acces';
+    if (record) {
+        document.getElementById('accessId').value = record.id;
+        document.getElementById('client_id').value = record.client_id;
+        document.getElementById('tip_acces').value = record.tip_acces;
+        document.getElementById('utilizator').value = record.utilizator || '';
+        document.getElementById('parola').value = record.parola || '';
+        document.getElementById('status').value = record.status;
+        document.getElementById('data_acces').value = record.data_acces || '';
+        document.getElementById('observatii').value = record.observatii || '';
+    } else {
+        document.getElementById('spvForm').reset();
+        document.getElementById('accessId').value = '';
+    }
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('active');
+}
+
+async function editAccess(id) {
+    const records = await API.get('/api/spv');
+    const r = records.find(x => x.id === id);
+    if (r) openModal(r);
+}
+
+async function saveAccess(e) {
+    e.preventDefault();
+    const id = document.getElementById('accessId').value;
+    const data = {
+        client_id: document.getElementById('client_id').value,
+        tip_acces: document.getElementById('tip_acces').value,
+        utilizator: document.getElementById('utilizator').value,
+        parola: document.getElementById('parola').value,
+        status: document.getElementById('status').value,
+        data_acces: document.getElementById('data_acces').value,
+        observatii: document.getElementById('observatii').value
+    };
+    try {
+        if (id) {
+            await API.put(`/api/spv/${id}`, data);
+            showAlert(document.getElementById('alerts'), 'Acces actualizat', 'success');
+        } else {
+            await API.post('/api/spv', data);
+            showAlert(document.getElementById('alerts'), 'Acces adaugat cu succes', 'success');
+        }
+        closeModal();
+        loadAccess();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+}
+
+async function deleteAccess(id) {
+    if (!confirm('Sigur doriti sa stergeti acest acces?')) return;
+    try {
+        await API.delete(`/api/spv/${id}`);
+        showAlert(document.getElementById('alerts'), 'Acces sters', 'success');
+        loadAccess();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+}
+
+document.getElementById('searchBox').addEventListener('input', () => {
+    clearTimeout(window._t);
+    window._t = setTimeout(loadAccess, 300);
+});
+document.getElementById('tipFilter').addEventListener('change', loadAccess);
+
+loadClients();
+loadAccess();
+</script>
+</body>
+</html>

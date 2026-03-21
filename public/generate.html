@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - Generare Contract</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>CRM</h1>
+            <p>Gestiune Contracte & Acces</p>
+        </div>
+        <nav>
+            <a href="/"><span class="icon">&#9776;</span> Dashboard</a>
+            <a href="/contracts.html"><span class="icon">&#128196;</span> Contracte</a>
+            <a href="/spv.html"><span class="icon">&#128273;</span> Acces SPV + 150</a>
+            <a href="/generate.html" class="active"><span class="icon">&#128424;</span> Generare Contract</a>
+            <a href="/clients.html"><span class="icon">&#128101;</span> Clienti</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h2>Generare Contract</h2>
+            <p>Genereaza contractul si Anexa GDPR completate cu datele clientului</p>
+        </div>
+
+        <div id="alerts"></div>
+
+        <!-- Template Management -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Template-uri Document</h3>
+                <span class="text-sm text-muted">Se incarca o singura data, raman salvate</span>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    Template-urile sunt deja configurate automat. Daca doriti sa incarcati alte template-uri, acestea trebuie sa contina placeholder-uri: <code>{denumire}</code>, <code>{cui}</code>, <code>{adresa}</code>, <code>{reprezentant_legal}</code>, <code>{nr_contract_num}</code>, <code>{nr_contract_year}</code>, <code>{data_contract}</code>, <code>{nr_reg_comert}</code>, <code>{onorariu_lunar}</code>, <code>{email}</code>.
+                </div>
+
+                <div id="templateContract" class="template-status">
+                    <div class="status-icon missing">&#10060;</div>
+                    <div class="info">
+                        <div class="name">Template Contract</div>
+                        <div class="detail">Neincarcat</div>
+                    </div>
+                    <div>
+                        <input type="file" id="fileContract" accept=".docx" style="display:none" onchange="uploadTemplate('contract', this)">
+                        <button class="btn btn-sm" onclick="document.getElementById('fileContract').click()">Incarca Template</button>
+                    </div>
+                </div>
+
+                <div id="templateGdpr" class="template-status">
+                    <div class="status-icon missing">&#10060;</div>
+                    <div class="info">
+                        <div class="name">Template Anexa GDPR</div>
+                        <div class="detail">Neincarcat</div>
+                    </div>
+                    <div>
+                        <input type="file" id="fileGdpr" accept=".docx" style="display:none" onchange="uploadTemplate('gdpr', this)">
+                        <button class="btn btn-sm" onclick="document.getElementById('fileGdpr').click()">Incarca Template</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Form -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Date Contract</h3>
+            </div>
+            <div class="card-body">
+                <form id="generateForm" onsubmit="generateContract(event)">
+                    <!-- Client selection -->
+                    <div class="form-group">
+                        <label>Client</label>
+                        <div style="display:flex;gap:12px;align-items:center">
+                            <select id="client_id" style="flex:1" onchange="toggleNewClient()">
+                                <option value="">Selecteaza client existent...</option>
+                                <option value="new">+ Client nou</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- New client fields (hidden by default) -->
+                    <div id="newClientFields" class="hidden" style="background:var(--gray-50);padding:16px;border-radius:8px;margin-bottom:16px">
+                        <h4 class="mb-2" style="font-size:14px;color:var(--gray-700)">Date Client Nou</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Denumire <span class="required">*</span></label>
+                                <input type="text" id="nc_denumire">
+                            </div>
+                            <div class="form-group">
+                                <label>CUI</label>
+                                <input type="text" id="nc_cui">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Nr. Reg. Comert</label>
+                            <input type="text" id="nc_nr_reg_comert">
+                        </div>
+                        <div class="form-group">
+                            <label>Adresa</label>
+                            <input type="text" id="nc_adresa">
+                        </div>
+                        <div class="form-group">
+                            <label>Reprezentant Legal</label>
+                            <input type="text" id="nc_reprezentant_legal">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" id="nc_email">
+                            </div>
+                            <div class="form-group">
+                                <label>Telefon</label>
+                                <input type="text" id="nc_telefon">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contract fields -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nr. Contract</label>
+                            <input type="text" id="nr_contract_preview" disabled placeholder="Se genereaza automat">
+                        </div>
+                        <div class="form-group">
+                            <label>Data Contract</label>
+                            <input type="date" id="data_contract">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Onorariu Lunar (LEI)</label>
+                            <input type="number" id="onorariu_lunar" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Onorariu pe Salariat (LEI)</label>
+                            <input type="number" id="onorariu_salariat" step="0.01" value="50">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="generateBtn" style="margin-top:8px">
+                        Genereaza Contract + Anexa GDPR
+                    </button>
+                </form>
+
+                <!-- Download area -->
+                <div id="downloadArea" class="download-area hidden">
+                    <h4>Documente generate cu succes!</h4>
+                    <div id="downloadLinks"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+async function loadTemplates() {
+    const templates = await API.get('/api/templates');
+    const contractTpl = templates.find(t => t.tip === 'contract');
+    const gdprTpl = templates.find(t => t.tip === 'gdpr');
+
+    updateTemplateStatus('templateContract', contractTpl);
+    updateTemplateStatus('templateGdpr', gdprTpl);
+}
+
+function updateTemplateStatus(elId, tpl) {
+    const el = document.getElementById(elId);
+    const icon = el.querySelector('.status-icon');
+    const detail = el.querySelector('.detail');
+    if (tpl) {
+        icon.className = 'status-icon ok';
+        icon.innerHTML = '&#10004;';
+        detail.textContent = `${tpl.filename} (incarcat: ${formatDate(tpl.uploaded_at)})`;
+    } else {
+        icon.className = 'status-icon missing';
+        icon.innerHTML = '&#10060;';
+        detail.textContent = 'Neincarcat';
+    }
+}
+
+async function uploadTemplate(tip, input) {
+    if (!input.files[0]) return;
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    fd.append('tip', tip);
+    try {
+        await API.upload('/api/templates/upload', fd);
+        showAlert(document.getElementById('alerts'), `Template ${tip} incarcat cu succes`, 'success');
+        loadTemplates();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+    input.value = '';
+}
+
+async function loadClients() {
+    const clients = await API.get('/api/clients');
+    const sel = document.getElementById('client_id');
+    const opts = '<option value="">Selecteaza client existent...</option><option value="new">+ Client nou</option>' +
+        clients.map(c => `<option value="${c.id}">${c.denumire} (${c.cui})</option>`).join('');
+    sel.innerHTML = opts;
+}
+
+function toggleNewClient() {
+    const val = document.getElementById('client_id').value;
+    document.getElementById('newClientFields').classList.toggle('hidden', val !== 'new');
+}
+
+async function loadNextNumber() {
+    const data = await API.get('/api/contracts/next-number/preview');
+    document.getElementById('nr_contract_preview').value = data.next_number;
+}
+
+async function generateContract(e) {
+    e.preventDefault();
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.textContent = 'Se genereaza...';
+
+    const clientVal = document.getElementById('client_id').value;
+    const payload = {
+        data_contract: document.getElementById('data_contract').value,
+        onorariu_lunar: parseFloat(document.getElementById('onorariu_lunar').value) || null,
+        onorariu_salariat: parseFloat(document.getElementById('onorariu_salariat').value) || 50
+    };
+
+    if (clientVal === 'new') {
+        payload.new_client = {
+            denumire: document.getElementById('nc_denumire').value,
+            cui: document.getElementById('nc_cui').value,
+            nr_reg_comert: document.getElementById('nc_nr_reg_comert').value,
+            adresa: document.getElementById('nc_adresa').value,
+            reprezentant_legal: document.getElementById('nc_reprezentant_legal').value,
+            email: document.getElementById('nc_email').value,
+            telefon: document.getElementById('nc_telefon').value
+        };
+    } else if (clientVal) {
+        payload.client_id = parseInt(clientVal);
+    } else {
+        showAlert(document.getElementById('alerts'), 'Selectati un client', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Genereaza Contract + Anexa GDPR';
+        return;
+    }
+
+    try {
+        const result = await API.post('/api/generate', payload);
+        showAlert(document.getElementById('alerts'), `Contract ${result.nr_contract} generat cu succes!`, 'success');
+
+        const area = document.getElementById('downloadArea');
+        area.classList.remove('hidden');
+        let links = '';
+        if (result.files.contract) {
+            links += `<a class="download-link" href="${result.files.contract}" download>&#128196; Descarca Contract</a>`;
+        }
+        if (result.files.gdpr) {
+            links += `<a class="download-link" href="${result.files.gdpr}" download>&#128196; Descarca Anexa GDPR</a>`;
+        }
+        document.getElementById('downloadLinks').innerHTML = links;
+
+        // Refresh
+        loadClients();
+        loadNextNumber();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Genereaza Contract + Anexa GDPR';
+}
+
+loadTemplates();
+loadClients();
+loadNextNumber();
+</script>
+</body>
+</html>

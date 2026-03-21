@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - Contracte</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>CRM</h1>
+            <p>Gestiune Contracte & Acces</p>
+        </div>
+        <nav>
+            <a href="/"><span class="icon">&#9776;</span> Dashboard</a>
+            <a href="/contracts.html" class="active"><span class="icon">&#128196;</span> Contracte</a>
+            <a href="/spv.html"><span class="icon">&#128273;</span> Acces SPV + 150</a>
+            <a href="/generate.html"><span class="icon">&#128424;</span> Generare Contract</a>
+            <a href="/clients.html"><span class="icon">&#128101;</span> Clienti</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h2>Evidenta Contracte</h2>
+            <p>Gestioneaza contractele clientilor</p>
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="toolbar">
+            <input type="text" class="search-box" id="searchBox" placeholder="Cauta dupa client, CUI sau nr. contract...">
+            <select id="statusFilter" style="width:auto;min-width:140px">
+                <option value="toate">Toate statusurile</option>
+                <option value="pregatit">Pregatit</option>
+                <option value="semnat">Semnat</option>
+                <option value="activ">Activ</option>
+                <option value="reziliat">Reziliat</option>
+            </select>
+            <button class="btn btn-primary" onclick="openModal()">+ Adauga Contract</button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nr. Contract</th>
+                                <th>Client</th>
+                                <th>CUI</th>
+                                <th>Data</th>
+                                <th>Onorariu Lunar</th>
+                                <th>Status</th>
+                                <th>Actiuni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contractsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">Adauga Contract</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="contractForm" onsubmit="saveContract(event)">
+                <input type="hidden" id="contractId">
+                <div class="form-group" id="clientSelectGroup">
+                    <label>Client <span class="required">*</span></label>
+                    <select id="client_id" required>
+                        <option value="">Selecteaza clientul...</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nr. Contract</label>
+                        <input type="text" id="nr_contract_preview" disabled placeholder="Se genereaza automat">
+                    </div>
+                    <div class="form-group">
+                        <label>Data Contract <span class="required">*</span></label>
+                        <input type="date" id="data_contract" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="status">
+                            <option value="pregatit">Pregatit</option>
+                            <option value="semnat">Semnat</option>
+                            <option value="activ">Activ</option>
+                            <option value="reziliat">Reziliat</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Onorariu Lunar (LEI)</label>
+                        <input type="number" id="onorariu_lunar" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Onorariu pe Salariat (LEI)</label>
+                    <input type="number" id="onorariu_salariat" step="0.01" value="50">
+                </div>
+                <div class="form-group">
+                    <label>Observatii</label>
+                    <textarea id="observatii" rows="3"></textarea>
+                </div>
+                <div class="modal-footer" style="padding:16px 0 0;border-top:1px solid var(--gray-200);margin-top:8px">
+                    <button type="button" class="btn" onclick="closeModal()">Anuleaza</button>
+                    <button type="submit" class="btn btn-primary">Salveaza</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+async function loadContracts() {
+    const search = document.getElementById('searchBox').value;
+    const status = document.getElementById('statusFilter').value;
+    let url = `/api/contracts?status=${status}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const contracts = await API.get(url);
+    const tbody = document.getElementById('contractsTable');
+    if (contracts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><p>Niciun contract gasit</p></td></tr>';
+        return;
+    }
+    tbody.innerHTML = contracts.map(c => `
+        <tr>
+            <td><strong>${c.nr_contract}</strong></td>
+            <td>${c.denumire}</td>
+            <td>${c.cui}</td>
+            <td>${formatDate(c.data_contract)}</td>
+            <td>${c.onorariu_lunar ? c.onorariu_lunar + ' LEI' : '-'}</td>
+            <td>${statusBadge(c.status)}</td>
+            <td class="actions">
+                <button class="btn btn-sm" onclick="editContract(${c.id})">Editeaza</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteContract(${c.id})">Sterge</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function loadClients() {
+    const clients = await API.get('/api/clients');
+    const sel = document.getElementById('client_id');
+    sel.innerHTML = '<option value="">Selecteaza clientul...</option>' +
+        clients.map(c => `<option value="${c.id}">${c.denumire} (${c.cui})</option>`).join('');
+}
+
+async function loadNextNumber() {
+    const data = await API.get('/api/contracts/next-number/preview');
+    document.getElementById('nr_contract_preview').value = data.next_number;
+}
+
+function openModal(contract = null) {
+    document.getElementById('modal').classList.add('active');
+    document.getElementById('modalTitle').textContent = contract ? 'Editeaza Contract' : 'Adauga Contract';
+    const clientGroup = document.getElementById('clientSelectGroup');
+
+    if (contract) {
+        document.getElementById('contractId').value = contract.id;
+        document.getElementById('client_id').value = contract.client_id;
+        clientGroup.style.display = 'none';
+        document.getElementById('client_id').removeAttribute('required');
+        document.getElementById('nr_contract_preview').value = contract.nr_contract;
+        document.getElementById('data_contract').value = contract.data_contract;
+        document.getElementById('status').value = contract.status;
+        document.getElementById('onorariu_lunar').value = contract.onorariu_lunar || '';
+        document.getElementById('onorariu_salariat').value = contract.onorariu_salariat || 50;
+        document.getElementById('observatii').value = contract.observatii || '';
+    } else {
+        document.getElementById('contractForm').reset();
+        document.getElementById('contractId').value = '';
+        clientGroup.style.display = '';
+        document.getElementById('client_id').setAttribute('required', 'required');
+        document.getElementById('onorariu_salariat').value = 50;
+        loadNextNumber();
+    }
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('active');
+}
+
+async function editContract(id) {
+    const contract = await API.get(`/api/contracts/${id}`);
+    openModal(contract);
+}
+
+async function saveContract(e) {
+    e.preventDefault();
+    const id = document.getElementById('contractId').value;
+    const data = {
+        client_id: document.getElementById('client_id').value,
+        data_contract: document.getElementById('data_contract').value,
+        status: document.getElementById('status').value,
+        onorariu_lunar: parseFloat(document.getElementById('onorariu_lunar').value) || null,
+        onorariu_salariat: parseFloat(document.getElementById('onorariu_salariat').value) || 50,
+        observatii: document.getElementById('observatii').value
+    };
+    try {
+        if (id) {
+            await API.put(`/api/contracts/${id}`, data);
+            showAlert(document.getElementById('alerts'), 'Contract actualizat', 'success');
+        } else {
+            await API.post('/api/contracts', data);
+            showAlert(document.getElementById('alerts'), 'Contract creat cu succes', 'success');
+        }
+        closeModal();
+        loadContracts();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+}
+
+async function deleteContract(id) {
+    if (!confirm('Sigur doriti sa stergeti acest contract?')) return;
+    try {
+        await API.delete(`/api/contracts/${id}`);
+        showAlert(document.getElementById('alerts'), 'Contract sters', 'success');
+        loadContracts();
+    } catch(err) {
+        showAlert(document.getElementById('alerts'), err.message, 'error');
+    }
+}
+
+document.getElementById('searchBox').addEventListener('input', () => {
+    clearTimeout(window._t);
+    window._t = setTimeout(loadContracts, 300);
+});
+document.getElementById('statusFilter').addEventListener('change', loadContracts);
+
+loadClients();
+loadContracts();
+</script>
+</body>
+</html>

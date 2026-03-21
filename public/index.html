@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>CRM</h1>
+            <p>Gestiune Contracte & Acces</p>
+        </div>
+        <nav>
+            <a href="/" class="active"><span class="icon">&#9776;</span> Dashboard</a>
+            <a href="/contracts.html"><span class="icon">&#128196;</span> Contracte</a>
+            <a href="/spv.html"><span class="icon">&#128273;</span> Acces SPV + 150</a>
+            <a href="/generate.html"><span class="icon">&#128424;</span> Generare Contract</a>
+            <a href="/clients.html"><span class="icon">&#128101;</span> Clienti</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h2>Dashboard</h2>
+            <p>Sumar general al activitatii</p>
+        </div>
+
+        <div class="stats-grid" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalClients">0</div>
+                <div class="stat-label">Clienti</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalContracts">0</div>
+                <div class="stat-label">Contracte Total</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-value" id="pregatite">0</div>
+                <div class="stat-label">Pregatite</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-value" id="semnate">0</div>
+                <div class="stat-label">Semnate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="active">0</div>
+                <div class="stat-label">Active</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalSpv">0</div>
+                <div class="stat-label">Accese SPV</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total150">0</div>
+                <div class="stat-label">Accese 150</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Ultimele contracte</h3>
+                <a href="/contracts.html" class="btn btn-sm">Vezi toate</a>
+            </div>
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nr. Contract</th>
+                                <th>Client</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentContracts">
+                            <tr><td colspan="4" class="text-muted">Se incarca...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+async function loadDashboard() {
+    try {
+        const stats = await API.get('/api/stats');
+        document.getElementById('totalClients').textContent = stats.totalClients;
+        document.getElementById('totalContracts').textContent = stats.totalContracts;
+        document.getElementById('pregatite').textContent = stats.pregatite;
+        document.getElementById('semnate').textContent = stats.semnate;
+        document.getElementById('active').textContent = stats.active;
+        document.getElementById('totalSpv').textContent = stats.totalSpv;
+        document.getElementById('total150').textContent = stats.total150;
+    } catch(e) { console.error(e); }
+
+    try {
+        const contracts = await API.get('/api/contracts');
+        const tbody = document.getElementById('recentContracts');
+        if (contracts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>Niciun contract inca</p></td></tr>';
+            return;
+        }
+        tbody.innerHTML = contracts.slice(0, 5).map(c => `
+            <tr>
+                <td><strong>${c.nr_contract}</strong></td>
+                <td>${c.denumire}</td>
+                <td>${formatDate(c.data_contract)}</td>
+                <td>${statusBadge(c.status)}</td>
+            </tr>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
