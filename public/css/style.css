@@ -304,7 +304,37 @@ td {
 
 tr:hover td { background: var(--gray-50); }
 
-.actions { display: flex; gap: 6px; }
+.actions { display: flex; gap: 6px; align-items: center; }
+
+/* Dropdown */
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    box-shadow: var(--shadow-lg);
+    min-width: 180px;
+    z-index: 50;
+    margin-top: 4px;
+}
+
+.dropdown-menu.open { display: block; }
+
+.dropdown-item {
+    display: block;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--gray-700);
+    text-decoration: none;
+    transition: background 0.15s;
+}
+
+.dropdown-item:hover { background: var(--gray-50); }
+
+.dropdown-item + .dropdown-item { border-top: 1px solid var(--gray-100); }
 
 /* Status badges */
 .badge {

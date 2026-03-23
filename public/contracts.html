@@ -39,7 +39,7 @@
                 <option value="activ">Activ</option>
                 <option value="reziliat">Reziliat</option>
             </select>
-            <button class="btn btn-primary" onclick="openModal()">+ Adauga Contract</button>
+            <a href="/generate.html" class="btn btn-primary">+ Genereaza Contract</a>
         </div>
 
         <div class="card">
@@ -65,26 +65,20 @@
     </main>
 </div>
 
-<!-- Modal -->
+<!-- Modal Editare -->
 <div class="modal-overlay" id="modal">
     <div class="modal">
         <div class="modal-header">
-            <h3 id="modalTitle">Adauga Contract</h3>
+            <h3 id="modalTitle">Editeaza Contract</h3>
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="modal-body">
             <form id="contractForm" onsubmit="saveContract(event)">
                 <input type="hidden" id="contractId">
-                <div class="form-group" id="clientSelectGroup">
-                    <label>Client <span class="required">*</span></label>
-                    <select id="client_id" required>
-                        <option value="">Selecteaza clientul...</option>
-                    </select>
-                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Nr. Contract</label>
-                        <input type="text" id="nr_contract_preview" disabled placeholder="Se genereaza automat">
+                        <input type="text" id="nr_contract_preview" disabled>
                     </div>
                     <div class="form-group">
                         <label>Data Contract <span class="required">*</span></label>
@@ -146,49 +140,29 @@ async function loadContracts() {
             <td>${statusBadge(c.status)}</td>
             <td class="actions">
                 <button class="btn btn-sm" onclick="editContract(${c.id})">Editeaza</button>
-                ${c.fisier_contract || c.fisier_gdpr ? `<button class="btn btn-sm btn-success" onclick="downloadContract(${c.id})">Descarca</button>` : ''}
+                ${c.fisier_contract || c.fisier_gdpr ? `<div class="dropdown" style="position:relative;display:inline-block">
+                    <button class="btn btn-sm btn-success" onclick="toggleDropdown(this)">Descarca &#9662;</button>
+                    <div class="dropdown-menu">
+                        ${c.fisier_contract ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_contract)}" class="dropdown-item">Contract</a>` : ''}
+                        ${c.fisier_gdpr ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_gdpr)}" class="dropdown-item">Anexa GDPR</a>` : ''}
+                        ${c.fisier_contract && c.fisier_gdpr ? `<a href="/api/generate/download-zip/${c.id}" class="dropdown-item">Contract + Anexa (ZIP)</a>` : ''}
+                    </div>
+                </div>` : ''}
                 <button class="btn btn-sm btn-danger" onclick="deleteContract(${c.id})">Sterge</button>
             </td>
         </tr>
     `).join('');
 }
 
-async function loadClients() {
-    const clients = await API.get('/api/clients');
-    const sel = document.getElementById('client_id');
-    sel.innerHTML = '<option value="">Selecteaza clientul...</option>' +
-        clients.map(c => `<option value="${c.id}">${c.denumire} (${c.cui})</option>`).join('');
-}
-
-async function loadNextNumber() {
-    const data = await API.get('/api/contracts/next-number/preview');
-    document.getElementById('nr_contract_preview').value = data.next_number;
-}
-
-function openModal(contract = null) {
+function openModal(contract) {
     document.getElementById('modal').classList.add('active');
-    document.getElementById('modalTitle').textContent = contract ? 'Editeaza Contract' : 'Adauga Contract';
-    const clientGroup = document.getElementById('clientSelectGroup');
-
-    if (contract) {
-        document.getElementById('contractId').value = contract.id;
-        document.getElementById('client_id').value = contract.client_id;
-        clientGroup.style.display = 'none';
-        document.getElementById('client_id').removeAttribute('required');
-        document.getElementById('nr_contract_preview').value = contract.nr_contract;
-        document.getElementById('data_contract').value = contract.data_contract;
-        document.getElementById('status').value = contract.status;
-        document.getElementById('onorariu_lunar').value = contract.onorariu_lunar || '';
-        document.getElementById('onorariu_salariat').value = contract.onorariu_salariat || 50;
-        document.getElementById('observatii').value = contract.observatii || '';
-    } else {
-        document.getElementById('contractForm').reset();
-        document.getElementById('contractId').value = '';
-        clientGroup.style.display = '';
-        document.getElementById('client_id').setAttribute('required', 'required');
-        document.getElementById('onorariu_salariat').value = 50;
-        loadNextNumber();
-    }
+    document.getElementById('contractId').value = contract.id;
+    document.getElementById('nr_contract_preview').value = contract.nr_contract;
+    document.getElementById('data_contract').value = contract.data_contract;
+    document.getElementById('status').value = contract.status;
+    document.getElementById('onorariu_lunar').value = contract.onorariu_lunar || '';
+    document.getElementById('onorariu_salariat').value = contract.onorariu_salariat || 50;
+    document.getElementById('observatii').value = contract.observatii || '';
 }
 
 function closeModal() {
@@ -204,7 +178,6 @@ async function saveContract(e) {
     e.preventDefault();
     const id = document.getElementById('contractId').value;
     const data = {
-        client_id: document.getElementById('client_id').value,
         data_contract: document.getElementById('data_contract').value,
         status: document.getElementById('status').value,
         onorariu_lunar: parseFloat(document.getElementById('onorariu_lunar').value) || null,
@@ -212,13 +185,8 @@ async function saveContract(e) {
         observatii: document.getElementById('observatii').value
     };
     try {
-        if (id) {
-            await API.put(`/api/contracts/${id}`, data);
-            showAlert(document.getElementById('alerts'), 'Contract actualizat', 'success');
-        } else {
-            await API.post('/api/contracts', data);
-            showAlert(document.getElementById('alerts'), 'Contract creat cu succes', 'success');
-        }
+        await API.put(`/api/contracts/${id}`, data);
+        showAlert(document.getElementById('alerts'), 'Contract actualizat', 'success');
         closeModal();
         loadContracts();
     } catch(err) {
@@ -226,9 +194,19 @@ async function saveContract(e) {
     }
 }
 
-function downloadContract(id) {
-    window.location.href = `/api/generate/download-zip/${id}`;
+function toggleDropdown(btn) {
+    // Close all other open dropdowns
+    document.querySelectorAll('.dropdown-menu.open').forEach(m => {
+        if (m !== btn.nextElementSibling) m.classList.remove('open');
+    });
+    btn.nextElementSibling.classList.toggle('open');
 }
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+    }
+});
 
 async function deleteContract(id) {
     if (!confirm('Sigur doriti sa stergeti acest contract?')) return;
@@ -247,7 +225,6 @@ document.getElementById('searchBox').addEventListener('input', () => {
 });
 document.getElementById('statusFilter').addEventListener('change', loadContracts);
 
-loadClients();
 loadContracts();
 </script>
 </body>
