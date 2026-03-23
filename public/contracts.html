@@ -146,6 +146,7 @@ async function loadContracts() {
             <td>${statusBadge(c.status)}</td>
             <td class="actions">
                 <button class="btn btn-sm" onclick="editContract(${c.id})">Editeaza</button>
+                ${c.fisier_contract || c.fisier_gdpr ? `<button class="btn btn-sm btn-success" onclick="downloadContract(${c.id})">Descarca</button>` : ''}
                 <button class="btn btn-sm btn-danger" onclick="deleteContract(${c.id})">Sterge</button>
             </td>
         </tr>
@@ -223,6 +224,10 @@ async function saveContract(e) {
     } catch(err) {
         showAlert(document.getElementById('alerts'), err.message, 'error');
     }
+}
+
+function downloadContract(id) {
+    window.location.href = `/api/generate/download-zip/${id}`;
 }
 
 async function deleteContract(id) {

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
+const fs = require('fs');
+const PizZip = require('pizzip');
 const { getDb } = require('../database');
 const { getNextContractNumber } = require('../services/contractNumber');
 const { generateContract } = require('../services/docxGenerator');
@@ -102,6 +104,44 @@ router.get('/download/:filename', (req, res) => {
     res.download(filepath, req.params.filename, (err) => {
         if (err) res.status(404).json({ error: 'Fisier negasit' });
     });
+});
+
+// GET download contract + annexa as ZIP
+router.get('/download-zip/:contractId', (req, res) => {
+    const db = getDb();
+    const contract = db.prepare(
+        `SELECT c.*, cl.denumire FROM contracts c JOIN clients cl ON c.client_id = cl.id WHERE c.id = ?`
+    ).get(req.params.contractId);
+
+    if (!contract) return res.status(404).json({ error: 'Contract negasit' });
+
+    const hasContract = contract.fisier_contract && fs.existsSync(path.join(GENERATED_DIR, contract.fisier_contract));
+    const hasGdpr = contract.fisier_gdpr && fs.existsSync(path.join(GENERATED_DIR, contract.fisier_gdpr));
+
+    if (!hasContract && !hasGdpr) {
+        return res.status(404).json({ error: 'Nu exista fisiere generate pentru acest contract. Generati mai intai documentele din pagina Generare Contract.' });
+    }
+
+    const zip = new PizZip();
+
+    if (hasContract) {
+        zip.file(contract.fisier_contract, fs.readFileSync(path.join(GENERATED_DIR, contract.fisier_contract)));
+    }
+    if (hasGdpr) {
+        zip.file(contract.fisier_gdpr, fs.readFileSync(path.join(GENERATED_DIR, contract.fisier_gdpr)));
+    }
+
+    const zipBuffer = zip.generate({ type: 'nodebuffer' });
+    const safeName = contract.denumire.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const safeNr = contract.nr_contract.replace('/', '-');
+    const zipFilename = `Contract_Anexa_${safeName}_${safeNr}.zip`;
+
+    res.set({
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${zipFilename}"`,
+        'Content-Length': zipBuffer.length
+    });
+    res.send(zipBuffer);
 });
 
 module.exports = router;
