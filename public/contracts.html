@@ -139,12 +139,13 @@ async function loadContracts() {
             <td>${statusBadge(c.status)}</td>
             <td class="actions">
                 <button class="btn btn-sm" onclick="editContract(${c.id})">Editeaza</button>
-                ${c.fisier_contract || c.fisier_gdpr ? `<div class="dropdown" style="position:relative;display:inline-block">
+                <button class="btn btn-sm" onclick="triggerUpload(${c.id})" title="Incarca contract PDF">&#128228; Incarca</button>
+                ${(c.fisier_contract || c.fisier_gdpr || c.fisier_contract_uploaded) ? `<div class="dropdown" style="position:relative;display:inline-block">
                     <button class="btn btn-sm btn-success" onclick="toggleDropdown(this)">Descarca &#9662;</button>
                     <div class="dropdown-menu">
-                        ${c.fisier_contract ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_contract)}" class="dropdown-item">Contract</a>` : ''}
-                        ${c.fisier_gdpr ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_gdpr)}" class="dropdown-item">Anexa GDPR</a>` : ''}
-                        ${c.fisier_contract && c.fisier_gdpr ? `<a href="/api/generate/download-zip/${c.id}" class="dropdown-item">Contract + Anexa (ZIP)</a>` : ''}
+                        ${c.fisier_contract && c.fisier_gdpr ? `<a href="/api/generate/download-zip/${c.id}" class="dropdown-item">Contract + Anexa GDPR (Draft)</a>` : ''}
+                        ${c.fisier_contract && !c.fisier_gdpr ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_contract)}" class="dropdown-item">Contract (Draft)</a>` : ''}
+                        ${c.fisier_contract_uploaded ? `<a href="/api/contracts/${c.id}/download-uploaded" class="dropdown-item">Contract Incarcat (PDF)</a>` : ''}
                     </div>
                 </div>` : ''}
                 <button class="btn btn-sm btn-danger" onclick="deleteContract(${c.id})">Sterge</button>
@@ -222,6 +223,31 @@ async function deleteContract(id) {
     } catch(err) {
         showAlert(document.getElementById('alerts'), err.message, 'error');
     }
+}
+
+function triggerUpload(contractId) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf';
+    input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const resp = await fetch(`/api/contracts/${contractId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error);
+            showAlert(document.getElementById('alerts'), 'Contract PDF incarcat cu succes', 'success');
+            loadContracts();
+        } catch (err) {
+            showAlert(document.getElementById('alerts'), err.message, 'error');
+        }
+    };
+    input.click();
 }
 
 document.getElementById('searchBox').addEventListener('input', () => {

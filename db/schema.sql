@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     observatii TEXT,
     fisier_contract TEXT,
     fisier_gdpr TEXT,
+    fisier_contract_uploaded TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (client_id) REFERENCES clients(id)

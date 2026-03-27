@@ -1,6 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { getDb } = require('../database');
+
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+
+const uploadStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._\-]/g, '_');
+        cb(null, `contract_uploaded_${req.params.id}_${Date.now()}_${safeName}`);
+    }
+});
+const uploadContract = multer({
+    storage: uploadStorage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') cb(null, true);
+        else cb(new Error('Doar fisiere PDF sunt acceptate'));
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }
+});
 const { getNextContractNumber } = require('../services/contractNumber');
 
 // ============ CLIENTS ============
@@ -142,6 +163,43 @@ router.put('/contracts/:id', (req, res) => {
         `UPDATE contracts SET data_contract=?, status=?, onorariu_lunar=?, onorariu_salariat=?, observatii=?, updated_at=datetime('now') WHERE id=?`
     ).run(data_contract, status, onorariu_lunar || null, onorariu_salariat || 50, observatii || null, req.params.id);
     res.json({ message: 'Contract actualizat' });
+});
+
+// POST upload contract PDF
+router.post('/contracts/:id/upload', uploadContract.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'Niciun fisier selectat' });
+    }
+    const db = getDb();
+    const contract = db.prepare("SELECT * FROM contracts WHERE id = ?").get(req.params.id);
+    if (!contract) {
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ error: 'Contract negasit' });
+    }
+    // Delete old uploaded file if exists
+    if (contract.fisier_contract_uploaded) {
+        const oldPath = path.join(UPLOADS_DIR, contract.fisier_contract_uploaded);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+    db.prepare("UPDATE contracts SET fisier_contract_uploaded = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(req.file.filename, req.params.id);
+    res.json({ message: 'Contract incarcat cu succes', filename: req.file.filename });
+});
+
+// GET download uploaded contract PDF
+router.get('/contracts/:id/download-uploaded', (req, res) => {
+    const db = getDb();
+    const contract = db.prepare("SELECT * FROM contracts WHERE id = ?").get(req.params.id);
+    if (!contract || !contract.fisier_contract_uploaded) {
+        return res.status(404).json({ error: 'Niciun contract incarcat' });
+    }
+    const filepath = path.join(UPLOADS_DIR, contract.fisier_contract_uploaded);
+    if (!fs.existsSync(filepath)) {
+        return res.status(404).json({ error: 'Fisierul nu a fost gasit' });
+    }
+    res.download(filepath, contract.fisier_contract_uploaded, (err) => {
+        if (err) res.status(404).json({ error: 'Eroare la descarcare' });
+    });
 });
 
 // DELETE contract

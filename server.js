@@ -22,6 +22,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 async function start() {
     const dbWrapper = await getDbWrapper();
 
+    // Migration: add fisier_contract_uploaded column if missing
+    try {
+        dbWrapper.prepare("SELECT fisier_contract_uploaded FROM contracts LIMIT 1").get();
+    } catch (e) {
+        dbWrapper.exec("ALTER TABLE contracts ADD COLUMN fisier_contract_uploaded TEXT");
+        console.log('Migration: added fisier_contract_uploaded column');
+    }
+
     // Seed existing templates on first run
     const existing = dbWrapper.prepare("SELECT COUNT(*) as cnt FROM templates").get();
     if (existing.cnt === 0) {
