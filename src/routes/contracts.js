@@ -166,24 +166,29 @@ router.put('/contracts/:id', (req, res) => {
 });
 
 // POST upload contract PDF
-router.post('/contracts/:id/upload', uploadContract.single('file'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'Niciun fisier selectat' });
-    }
-    const db = getDb();
-    const contract = db.prepare("SELECT * FROM contracts WHERE id = ?").get(req.params.id);
-    if (!contract) {
-        fs.unlinkSync(req.file.path);
-        return res.status(404).json({ error: 'Contract negasit' });
-    }
-    // Delete old uploaded file if exists
-    if (contract.fisier_contract_uploaded) {
-        const oldPath = path.join(UPLOADS_DIR, contract.fisier_contract_uploaded);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-    db.prepare("UPDATE contracts SET fisier_contract_uploaded = ?, updated_at = datetime('now') WHERE id = ?")
-        .run(req.file.filename, req.params.id);
-    res.json({ message: 'Contract incarcat cu succes', filename: req.file.filename });
+router.post('/contracts/:id/upload', (req, res) => {
+    uploadContract.single('file')(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ error: err.message || 'Eroare la incarcare fisier' });
+        }
+        if (!req.file) {
+            return res.status(400).json({ error: 'Niciun fisier selectat' });
+        }
+        const db = getDb();
+        const contract = db.prepare("SELECT * FROM contracts WHERE id = ?").get(req.params.id);
+        if (!contract) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Contract negasit' });
+        }
+        // Delete old uploaded file if exists
+        if (contract.fisier_contract_uploaded) {
+            const oldPath = path.join(UPLOADS_DIR, contract.fisier_contract_uploaded);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+        db.prepare("UPDATE contracts SET fisier_contract_uploaded = ?, updated_at = datetime('now') WHERE id = ?")
+            .run(req.file.filename, req.params.id);
+        res.json({ message: 'Contract incarcat cu succes', filename: req.file.filename });
+    });
 });
 
 // GET download uploaded contract PDF

@@ -143,8 +143,9 @@ async function loadContracts() {
                 ${(c.fisier_contract || c.fisier_gdpr || c.fisier_contract_uploaded) ? `<div class="dropdown" style="position:relative;display:inline-block">
                     <button class="btn btn-sm btn-success" onclick="toggleDropdown(this)">Descarca &#9662;</button>
                     <div class="dropdown-menu">
-                        ${c.fisier_contract && c.fisier_gdpr ? `<a href="/api/generate/download-zip/${c.id}" class="dropdown-item">Contract + Anexa GDPR (Draft)</a>` : ''}
-                        ${c.fisier_contract && !c.fisier_gdpr ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_contract)}" class="dropdown-item">Contract (Draft)</a>` : ''}
+                        ${c.fisier_contract && c.fisier_gdpr ? `<a href="/api/generate/download-zip/${c.id}" class="dropdown-item">Contract + Anexa GDPR (ZIP)</a>` : ''}
+                        ${c.fisier_contract ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_contract)}" class="dropdown-item">Contract (Draft)</a>` : ''}
+                        ${c.fisier_gdpr ? `<a href="/api/generate/download/${encodeURIComponent(c.fisier_gdpr)}" class="dropdown-item">Anexa GDPR (Draft)</a>` : ''}
                         ${c.fisier_contract_uploaded ? `<a href="/api/contracts/${c.id}/download-uploaded" class="dropdown-item">Contract Incarcat (PDF)</a>` : ''}
                     </div>
                 </div>` : ''}
