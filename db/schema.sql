@@ -32,12 +32,9 @@ CREATE TABLE IF NOT EXISTS contracts (
 -- Acces SPV + 150 (Modul 2)
 CREATE TABLE IF NOT EXISTS spv_access (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER NOT NULL,
-    tip_acces TEXT NOT NULL,
-    utilizator TEXT,
-    parola TEXT,
-    status TEXT NOT NULL DEFAULT 'activ',
-    data_acces TEXT,
+    client_id INTEGER NOT NULL UNIQUE,
+    acces_spv INTEGER NOT NULL DEFAULT 0,
+    acces_150 INTEGER NOT NULL DEFAULT 0,
     observatii TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),

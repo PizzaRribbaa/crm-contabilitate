@@ -30,6 +30,24 @@ async function start() {
         console.log('Migration: added fisier_contract_uploaded column');
     }
 
+    // Migration: restructure spv_access table (remove utilizator/parola, add acces_spv/acces_150)
+    try {
+        dbWrapper.prepare("SELECT acces_spv FROM spv_access LIMIT 1").get();
+    } catch (e) {
+        dbWrapper.exec("DROP TABLE IF EXISTS spv_access");
+        dbWrapper.exec(`CREATE TABLE spv_access (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL UNIQUE,
+            acces_spv INTEGER NOT NULL DEFAULT 0,
+            acces_150 INTEGER NOT NULL DEFAULT 0,
+            observatii TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (client_id) REFERENCES clients(id)
+        )`);
+        console.log('Migration: restructured spv_access table');
+    }
+
     // Seed existing templates on first run
     const existing = dbWrapper.prepare("SELECT COUNT(*) as cnt FROM templates").get();
     if (existing.cnt === 0) {
@@ -77,8 +95,8 @@ async function start() {
         const pregatite = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'pregatit'").get().cnt;
         const semnate = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'semnat'").get().cnt;
         const active = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'activ'").get().cnt;
-        const totalSpv = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE tip_acces = 'SPV'").get().cnt;
-        const total150 = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE tip_acces = '150'").get().cnt;
+        const totalSpv = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_spv = 1").get().cnt;
+        const total150 = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_150 = 1").get().cnt;
         res.json({ totalClients, totalContracts, pregatite, semnate, active, totalSpv, total150 });
     });
 

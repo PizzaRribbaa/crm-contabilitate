@@ -25,18 +25,13 @@
     <main class="main">
         <div class="page-header">
             <h2>Evidenta Acces SPV + 150</h2>
-            <p>Gestioneaza datele de acces SPV si Declaratia 150</p>
+            <p>Gestioneaza accesul clientilor la SPV si Declaratia 150</p>
         </div>
 
         <div id="alerts"></div>
 
         <div class="toolbar">
             <input type="text" class="search-box" id="searchBox" placeholder="Cauta dupa client sau CUI...">
-            <select id="tipFilter" style="width:auto;min-width:120px">
-                <option value="toate">Toate</option>
-                <option value="SPV">SPV</option>
-                <option value="150">150</option>
-            </select>
             <button class="btn btn-primary" onclick="openModal()">+ Adauga Acces</button>
         </div>
 
@@ -48,11 +43,8 @@
                             <tr>
                                 <th>Client</th>
                                 <th>CUI</th>
-                                <th>Tip</th>
-                                <th>Utilizator</th>
-                                <th>Parola</th>
-                                <th>Status</th>
-                                <th>Data Acces</th>
+                                <th>Acces 150</th>
+                                <th>Acces SPV</th>
                                 <th>Observatii</th>
                                 <th>Actiuni</th>
                             </tr>
@@ -83,34 +75,19 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Tip Acces <span class="required">*</span></label>
-                        <select id="tip_acces" required>
-                            <option value="SPV">SPV</option>
-                            <option value="150">150</option>
+                        <label>Acces 150</label>
+                        <select id="acces_150">
+                            <option value="0">Nu</option>
+                            <option value="1">Da</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Status</label>
-                        <select id="status">
-                            <option value="activ">Activ</option>
-                            <option value="inactiv">Inactiv</option>
-                            <option value="expirat">Expirat</option>
+                        <label>Acces SPV</label>
+                        <select id="acces_spv">
+                            <option value="0">Nu</option>
+                            <option value="1">Da</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Utilizator</label>
-                        <input type="text" id="utilizator">
-                    </div>
-                    <div class="form-group">
-                        <label>Parola</label>
-                        <input type="text" id="parola">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Data Acces</label>
-                    <input type="date" id="data_acces">
                 </div>
                 <div class="form-group">
                     <label>Observatii</label>
@@ -127,31 +104,22 @@
 
 <script src="/js/api.js"></script>
 <script>
-let passwordVisible = {};
-
 async function loadAccess() {
     const search = document.getElementById('searchBox').value;
-    const tip = document.getElementById('tipFilter').value;
-    let url = `/api/spv?tip=${tip}`;
-    if (search) url += `&search=${encodeURIComponent(search)}`;
+    let url = '/api/spv';
+    if (search) url += `?search=${encodeURIComponent(search)}`;
     const records = await API.get(url);
     const tbody = document.getElementById('spvTable');
     if (records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>Niciun acces inregistrat</p></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>Niciun acces inregistrat</p></td></tr>';
         return;
     }
     tbody.innerHTML = records.map(r => `
         <tr>
             <td><strong>${r.denumire}</strong></td>
             <td>${r.cui}</td>
-            <td>${badgeHtml(r.tip_acces, r.tip_acces.toLowerCase())}</td>
-            <td>${r.utilizator || '-'}</td>
-            <td>
-                <span id="pwd-${r.id}">${passwordVisible[r.id] ? (r.parola || '-') : '********'}</span>
-                ${r.parola ? `<button class="btn btn-sm btn-icon" onclick="togglePwd(${r.id}, '${(r.parola || '').replace(/'/g, "\\'")}')" style="margin-left:4px">&#128065;</button>` : ''}
-            </td>
-            <td>${statusBadge(r.status)}</td>
-            <td>${formatDate(r.data_acces)}</td>
+            <td>${r.acces_150 ? '<span class="badge badge-activ">Da</span>' : '<span class="badge badge-inactiv">Nu</span>'}</td>
+            <td>${r.acces_spv ? '<span class="badge badge-activ">Da</span>' : '<span class="badge badge-inactiv">Nu</span>'}</td>
             <td class="text-sm">${r.observatii || '-'}</td>
             <td class="actions">
                 <button class="btn btn-sm" onclick="editAccess(${r.id})">Editeaza</button>
@@ -159,11 +127,6 @@ async function loadAccess() {
             </td>
         </tr>
     `).join('');
-}
-
-function togglePwd(id, pwd) {
-    passwordVisible[id] = !passwordVisible[id];
-    document.getElementById(`pwd-${id}`).textContent = passwordVisible[id] ? pwd : '********';
 }
 
 async function loadClients() {
@@ -179,11 +142,8 @@ function openModal(record = null) {
     if (record) {
         document.getElementById('accessId').value = record.id;
         document.getElementById('client_id').value = record.client_id;
-        document.getElementById('tip_acces').value = record.tip_acces;
-        document.getElementById('utilizator').value = record.utilizator || '';
-        document.getElementById('parola').value = record.parola || '';
-        document.getElementById('status').value = record.status;
-        document.getElementById('data_acces').value = record.data_acces || '';
+        document.getElementById('acces_150').value = record.acces_150 ? '1' : '0';
+        document.getElementById('acces_spv').value = record.acces_spv ? '1' : '0';
         document.getElementById('observatii').value = record.observatii || '';
     } else {
         document.getElementById('spvForm').reset();
@@ -206,11 +166,8 @@ async function saveAccess(e) {
     const id = document.getElementById('accessId').value;
     const data = {
         client_id: document.getElementById('client_id').value,
-        tip_acces: document.getElementById('tip_acces').value,
-        utilizator: document.getElementById('utilizator').value,
-        parola: document.getElementById('parola').value,
-        status: document.getElementById('status').value,
-        data_acces: document.getElementById('data_acces').value,
+        acces_150: parseInt(document.getElementById('acces_150').value),
+        acces_spv: parseInt(document.getElementById('acces_spv').value),
         observatii: document.getElementById('observatii').value
     };
     try {
@@ -243,7 +200,6 @@ document.getElementById('searchBox').addEventListener('input', () => {
     clearTimeout(window._t);
     window._t = setTimeout(loadAccess, 300);
 });
-document.getElementById('tipFilter').addEventListener('change', loadAccess);
 
 loadClients();
 loadAccess();
