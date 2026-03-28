@@ -58,3 +58,13 @@ CREATE TABLE IF NOT EXISTS settings (
 
 INSERT OR IGNORE INTO settings (key, value) VALUES ('contract_seq_year', '2026');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('contract_seq_num', '0');
+
+-- TO DO
+CREATE TABLE IF NOT EXISTS todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    due_time TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);

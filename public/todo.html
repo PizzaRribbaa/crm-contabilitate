@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - TO DO</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .todo-tabs { display: flex; gap: 0; margin-bottom: 20px; }
+        .todo-tab {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid var(--gray-300);
+            background: white;
+            cursor: pointer;
+            color: var(--gray-500);
+            transition: all 0.15s;
+        }
+        .todo-tab:first-child { border-radius: 6px 0 0 6px; }
+        .todo-tab:last-child { border-radius: 0 6px 6px 0; }
+        .todo-tab + .todo-tab { border-left: none; }
+        .todo-tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .todo-tab .count {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 6px;
+        }
+        .todo-tab.active .count { background: rgba(255,255,255,0.3); }
+        .todo-tab:not(.active) .count { background: var(--gray-200); color: var(--gray-700); }
+
+        .add-todo-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+            align-items: flex-end;
+        }
+        .add-todo-form .form-group { margin-bottom: 0; flex: 1; }
+        .add-todo-form .date-group { flex: 0 0 160px; }
+
+        .todo-list { list-style: none; }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-100);
+            transition: background 0.15s;
+        }
+        .todo-item:hover { background: var(--gray-50); }
+        .todo-item.item-done { opacity: 0.55; }
+        .todo-item.item-done .todo-text { text-decoration: line-through; color: var(--gray-500); }
+        .todo-item.item-overdue { background: #fff5f5; }
+
+        .todo-check {
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--gray-300);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+            background: white;
+        }
+        .todo-check:hover { border-color: var(--primary); }
+        .todo-item.item-done .todo-check {
+            background: #16a34a;
+            border-color: #16a34a;
+            color: white;
+        }
+        .todo-item.item-overdue .todo-check {
+            border-color: var(--danger);
+        }
+
+        .todo-text { flex: 1; font-size: 14px; }
+
+        .todo-status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            flex-shrink: 0;
+        }
+        .status-in-progress { background: #fef3c7; color: #92400e; }
+        .status-done { background: #d1fae5; color: #065f46; }
+        .status-overdue { background: #fecaca; color: #991b1b; }
+
+        .todo-date {
+            font-size: 12px;
+            color: var(--gray-500);
+            flex-shrink: 0;
+        }
+
+        .todo-actions { display: flex; gap: 4px; }
+        .todo-delete {
+            background: none;
+            border: none;
+            color: var(--gray-300);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .todo-delete:hover { color: var(--danger); background: #fef2f2; }
+
+        .todo-section-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 12px 16px 8px;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .clear-done {
+            font-size: 13px;
+            color: var(--gray-500);
+            cursor: pointer;
+            background: none;
+            border: none;
+            text-decoration: underline;
+        }
+        .clear-done:hover { color: var(--danger); }
+
+        .status-legend {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            color: var(--gray-500);
+        }
+        .status-legend span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .legend-dot.orange { background: #f59e0b; }
+        .legend-dot.green { background: #16a34a; }
+        .legend-dot.red { background: #dc2626; }
+    </style>
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>CRM</h1>
+            <p>Gestiune Contracte & Acces</p>
+        </div>
+        <nav>
+            <a href="/"><span class="icon">&#9776;</span> Dashboard</a>
+            <a href="/contracts.html"><span class="icon">&#128196;</span> Contracte</a>
+            <a href="/spv.html"><span class="icon">&#128273;</span> Acces SPV + 150</a>
+            <a href="/generate.html"><span class="icon">&#128424;</span> Generare Contract</a>
+            <a href="/clients.html"><span class="icon">&#128101;</span> Clienti</a>
+            <a href="/todo.html" class="active"><span class="icon">&#9745;</span> TO DO</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h2>TO DO</h2>
+            <p>Taskurile tale pe azi si saptamana asta</p>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form class="add-todo-form" id="addForm" onsubmit="addTodo(event)">
+                    <div class="form-group">
+                        <label>Ce ai de facut?</label>
+                        <input type="text" id="todoText" placeholder="Adauga un task..." required>
+                    </div>
+                    <div class="form-group date-group">
+                        <label>Deadline</label>
+                        <input type="date" id="todoDate" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Adauga</button>
+                </form>
+
+                <div class="status-legend">
+                    <span><span class="legend-dot orange"></span> In Progress</span>
+                    <span><span class="legend-dot green"></span> Done</span>
+                    <span><span class="legend-dot red"></span> Overdue</span>
+                </div>
+
+                <div class="todo-tabs">
+                    <button class="todo-tab active" onclick="setTab('azi')">Azi <span class="count" id="countAzi">0</span></button>
+                    <button class="todo-tab" onclick="setTab('saptamana')">Saptamana <span class="count" id="countSaptamana">0</span></button>
+                    <button class="todo-tab" onclick="setTab('toate')">Toate <span class="count" id="countToate">0</span></button>
+                </div>
+
+                <div id="todoContainer">
+                    <ul class="todo-list" id="todoList"></ul>
+                </div>
+
+                <div style="margin-top: 12px; text-align: right;">
+                    <button class="clear-done" onclick="clearDone()" id="clearBtn" style="display:none;">Sterge taskurile finalizate</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+let todos = [];
+let currentTab = 'azi';
+
+function getToday() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function getWeekEnd() {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = day === 0 ? 0 : 7 - day;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+}
+
+function getWeekStart() {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+}
+
+function getStatus(todo) {
+    if (todo.done) return 'done';
+    const today = getToday();
+    if (todo.due_date < today) return 'overdue';
+    return 'in_progress';
+}
+
+function filterTodos(tab) {
+    const today = getToday();
+    const weekStart = getWeekStart();
+    const weekEnd = getWeekEnd();
+    if (tab === 'azi') return todos.filter(t => t.due_date === today || (getStatus(t) === 'overdue'));
+    if (tab === 'saptamana') return todos.filter(t => (t.due_date >= weekStart && t.due_date <= weekEnd) || getStatus(t) === 'overdue');
+    return todos;
+}
+
+function setTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.todo-tab').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.todo-tab[onclick="setTab('${tab}')"]`).classList.add('active');
+    render();
+}
+
+function formatDateRo(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const days = ['Duminica', 'Luni', 'Marti', 'Miercuri', 'Joi', 'Vineri', 'Sambata'];
+    const today = getToday();
+    if (dateStr === today) return 'Azi';
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (dateStr === tomorrow.toISOString().split('T')[0]) return 'Maine';
+    return days[d.getDay()] + ' ' + d.toLocaleDateString('ro-RO');
+}
+
+function statusBadgeHtml(status) {
+    const map = {
+        'in_progress': '<span class="todo-status status-in-progress">In Progress</span>',
+        'done': '<span class="todo-status status-done">Done</span>',
+        'overdue': '<span class="todo-status status-overdue">Overdue</span>'
+    };
+    return map[status] || '';
+}
+
+function groupByDate(items) {
+    const groups = {};
+    items.forEach(t => {
+        if (!groups[t.due_date]) groups[t.due_date] = [];
+        groups[t.due_date].push(t);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+}
+
+function render() {
+    const filtered = filterTodos(currentTab);
+    const list = document.getElementById('todoList');
+    const hasDone = todos.some(t => t.done);
+    document.getElementById('clearBtn').style.display = hasDone ? '' : 'none';
+
+    const today = getToday();
+    const weekStart = getWeekStart();
+    const weekEnd = getWeekEnd();
+    document.getElementById('countAzi').textContent = todos.filter(t => (t.due_date === today || t.due_date < today) && !t.done).length;
+    document.getElementById('countSaptamana').textContent = todos.filter(t => (t.due_date >= weekStart && t.due_date <= weekEnd || t.due_date < weekStart) && !t.done).length;
+    document.getElementById('countToate').textContent = todos.filter(t => !t.done).length;
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="empty-state"><p>Niciun task' +
+            (currentTab === 'azi' ? ' pentru azi' : currentTab === 'saptamana' ? ' saptamana asta' : '') +
+            '. Adauga unul!</p></div>';
+        return;
+    }
+
+    const groups = groupByDate(filtered);
+    let html = '';
+    groups.forEach(([date, items]) => {
+        if (currentTab !== 'azi' || date !== today) {
+            html += `<div class="todo-section-header">${formatDateRo(date)}</div>`;
+        }
+        items.forEach(t => {
+            const status = getStatus(t);
+            const itemClass = status === 'done' ? 'item-done' : status === 'overdue' ? 'item-overdue' : '';
+            html += `
+                <li class="todo-item ${itemClass}" data-id="${t.id}">
+                    <div class="todo-check" onclick="toggleTodo(${t.id})">${t.done ? '&#10003;' : ''}</div>
+                    <span class="todo-text">${escHtml(t.text)}</span>
+                    ${statusBadgeHtml(status)}
+                    <span class="todo-date">${formatDateRo(t.due_date)}</span>
+                    <div class="todo-actions">
+                        <button class="todo-delete" onclick="deleteTodo(${t.id})" title="Sterge">&#10005;</button>
+                    </div>
+                </li>`;
+        });
+    });
+    list.innerHTML = html;
+}
+
+function escHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+async function loadTodos() {
+    try {
+        todos = await API.get('/api/todos');
+        render();
+    } catch(e) { console.error(e); }
+}
+
+async function addTodo(e) {
+    e.preventDefault();
+    const text = document.getElementById('todoText').value.trim();
+    const due_date = document.getElementById('todoDate').value;
+    if (!text || !due_date) return;
+    try {
+        await API.post('/api/todos', { text, due_date });
+        document.getElementById('todoText').value = '';
+        await loadTodos();
+    } catch(e) { alert(e.message); }
+}
+
+async function toggleTodo(id) {
+    try {
+        await API.put(`/api/todos/${id}/toggle`, {});
+        await loadTodos();
+    } catch(e) { alert(e.message); }
+}
+
+async function deleteTodo(id) {
+    try {
+        await API.delete(`/api/todos/${id}`);
+        await loadTodos();
+    } catch(e) { alert(e.message); }
+}
+
+async function clearDone() {
+    try {
+        await API.delete('/api/todos-done');
+        await loadTodos();
+    } catch(e) { alert(e.message); }
+}
+
+document.getElementById('todoDate').value = getToday();
+loadTodos();
+</script>
+</body>
+</html>

@@ -48,6 +48,14 @@ async function start() {
         console.log('Migration: restructured spv_access table');
     }
 
+    // Migration: add due_time column to todos
+    try {
+        dbWrapper.prepare("SELECT due_time FROM todos LIMIT 1").get();
+    } catch (e) {
+        dbWrapper.exec("ALTER TABLE todos ADD COLUMN due_time TEXT");
+        console.log('Migration: added due_time column to todos');
+    }
+
     // Seed existing templates on first run
     const existing = dbWrapper.prepare("SELECT COUNT(*) as cnt FROM templates").get();
     if (existing.cnt === 0) {
@@ -81,11 +89,13 @@ async function start() {
     const spvRoutes = require('./src/routes/spv');
     const templateRoutes = require('./src/routes/templates');
     const generateRoutes = require('./src/routes/generate');
+    const todoRoutes = require('./src/routes/todos');
 
     app.use('/api', contractRoutes);
     app.use('/api/spv', spvRoutes);
     app.use('/api/templates', templateRoutes);
     app.use('/api/generate', generateRoutes);
+    app.use('/api', todoRoutes);
 
     // Dashboard stats
     app.get('/api/stats', (req, res) => {
@@ -97,7 +107,8 @@ async function start() {
         const active = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'activ'").get().cnt;
         const totalSpv = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_spv = 1").get().cnt;
         const total150 = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_150 = 1").get().cnt;
-        res.json({ totalClients, totalContracts, pregatite, semnate, active, totalSpv, total150 });
+        const todosAzi = db.prepare("SELECT COUNT(*) as cnt FROM todos WHERE due_date = date('now') AND done = 0").get().cnt;
+        res.json({ totalClients, totalContracts, pregatite, semnate, active, totalSpv, total150, todosAzi });
     });
 
     app.listen(PORT, () => {
