@@ -2,7 +2,9 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-const { initDb, getDbWrapper } = require('./src/database');
+const session = require('express-session');
+const { initDb, getDb } = require('./src/database');
+const { authMiddleware, AUTH_USER, AUTH_PASS } = require('./src/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +13,40 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'crm-secret-local-dev-key-2026',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production' && process.env.DATABASE_URL ? true : false,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 ore
+    },
+    ...(process.env.NODE_ENV === 'production' ? { proxy: true } : {})
+}));
+
+// Login/Logout API (before auth middleware)
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    if (username === AUTH_USER && password === AUTH_PASS) {
+        req.session.authenticated = true;
+        res.json({ message: 'OK' });
+    } else {
+        res.status(401).json({ error: 'Utilizator sau parola incorecta' });
+    }
+});
+
+app.post('/api/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ message: 'OK' });
+});
+
+// Auth middleware
+app.use(authMiddleware);
+
+// Static files (after auth)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Ensure directories exist
@@ -20,67 +56,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 });
 
 async function start() {
-    const dbWrapper = await getDbWrapper();
+    await initDb();
+    const db = getDb();
 
-    // Migration: add fisier_contract_uploaded column if missing
-    try {
-        dbWrapper.prepare("SELECT fisier_contract_uploaded FROM contracts LIMIT 1").get();
-    } catch (e) {
-        dbWrapper.exec("ALTER TABLE contracts ADD COLUMN fisier_contract_uploaded TEXT");
-        console.log('Migration: added fisier_contract_uploaded column');
-    }
-
-    // Migration: restructure spv_access table (remove utilizator/parola, add acces_spv/acces_150)
-    try {
-        dbWrapper.prepare("SELECT acces_spv FROM spv_access LIMIT 1").get();
-    } catch (e) {
-        dbWrapper.exec("DROP TABLE IF EXISTS spv_access");
-        dbWrapper.exec(`CREATE TABLE spv_access (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_id INTEGER NOT NULL UNIQUE,
-            acces_spv INTEGER NOT NULL DEFAULT 0,
-            acces_150 INTEGER NOT NULL DEFAULT 0,
-            observatii TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (client_id) REFERENCES clients(id)
-        )`);
-        console.log('Migration: restructured spv_access table');
-    }
-
-    // Migration: add due_time column to todos
-    try {
-        dbWrapper.prepare("SELECT due_time FROM todos LIMIT 1").get();
-    } catch (e) {
-        dbWrapper.exec("ALTER TABLE todos ADD COLUMN due_time TEXT");
-        console.log('Migration: added due_time column to todos');
-    }
-
-    // Seed existing templates on first run
-    const existing = dbWrapper.prepare("SELECT COUNT(*) as cnt FROM templates").get();
-    if (existing.cnt === 0) {
-        const files = [
-            { tip: 'contract', name: 'Contract de contabilitate si HR final.docx' },
-            { tip: 'gdpr', name: 'Anexa_GDPR.docx' }
-        ];
-        files.forEach(f => {
-            const src = path.join(__dirname, f.name);
-            const dest = path.join(__dirname, 'uploads', `template_${f.tip}.docx`);
-            if (fs.existsSync(src)) {
-                fs.copyFileSync(src, dest);
-                dbWrapper.prepare(
-                    "INSERT OR IGNORE INTO templates (tip, filename, filepath) VALUES (?, ?, ?)"
-                ).run(f.tip, f.name, dest);
-                console.log(`Template ${f.tip} importat: ${f.name}`);
-            }
-        });
-
-        // Auto-configure templates with placeholders
+    // Migrations for SQLite local dev only
+    if (!process.env.DATABASE_URL) {
         try {
-            require('./setup-templates');
-            console.log('Template-uri configurate cu placeholder-uri automat.');
-        } catch(e) {
-            console.error('Eroare configurare template-uri:', e.message);
+            await db.prepare("SELECT fisier_contract_uploaded FROM contracts LIMIT 1").get();
+        } catch (e) {
+            db.exec("ALTER TABLE contracts ADD COLUMN fisier_contract_uploaded TEXT");
+            console.log('Migration: added fisier_contract_uploaded column');
+        }
+
+        try {
+            await db.prepare("SELECT due_time FROM todos LIMIT 1").get();
+        } catch (e) {
+            db.exec("ALTER TABLE todos ADD COLUMN due_time TEXT");
+            console.log('Migration: added due_time column to todos');
         }
     }
 
@@ -98,17 +90,18 @@ async function start() {
     app.use('/api', todoRoutes);
 
     // Dashboard stats
-    app.get('/api/stats', (req, res) => {
-        const db = dbWrapper;
-        const totalClients = db.prepare("SELECT COUNT(*) as cnt FROM clients").get().cnt;
-        const totalContracts = db.prepare("SELECT COUNT(*) as cnt FROM contracts").get().cnt;
-        const pregatite = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'pregatit'").get().cnt;
-        const semnate = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'semnat'").get().cnt;
-        const active = db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'activ'").get().cnt;
-        const totalSpv = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_spv = 1").get().cnt;
-        const total150 = db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_150 = 1").get().cnt;
-        const todosAzi = db.prepare("SELECT COUNT(*) as cnt FROM todos WHERE due_date = date('now') AND done = 0").get().cnt;
-        res.json({ totalClients, totalContracts, pregatite, semnate, active, totalSpv, total150, todosAzi });
+    app.get('/api/stats', async (req, res) => {
+        try {
+            const totalClients = (await db.prepare("SELECT COUNT(*) as cnt FROM clients").get()).cnt;
+            const totalContracts = (await db.prepare("SELECT COUNT(*) as cnt FROM contracts").get()).cnt;
+            const pregatite = (await db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'pregatit'").get()).cnt;
+            const semnate = (await db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'semnat'").get()).cnt;
+            const active = (await db.prepare("SELECT COUNT(*) as cnt FROM contracts WHERE status = 'activ'").get()).cnt;
+            const totalSpv = (await db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_spv = 1").get()).cnt;
+            const total150 = (await db.prepare("SELECT COUNT(*) as cnt FROM spv_access WHERE acces_150 = 1").get()).cnt;
+            const todosAzi = (await db.prepare("SELECT COUNT(*) as cnt FROM todos WHERE due_date = ? AND done = 0").get(new Date().toISOString().split('T')[0])).cnt;
+            res.json({ totalClients, totalContracts, pregatite, semnate, active, totalSpv, total150, todosAzi });
+        } catch(e) { res.status(500).json({ error: e.message }); }
     });
 
     app.listen(PORT, () => {

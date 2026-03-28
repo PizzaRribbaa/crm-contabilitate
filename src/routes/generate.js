@@ -9,72 +9,60 @@ const { generateContract } = require('../services/docxGenerator');
 
 const GENERATED_DIR = path.join(__dirname, '..', '..', 'generated');
 
-// POST generate contract + GDPR
-router.post('/', (req, res) => {
-    const db = getDb();
-    const { client_id, data_contract, onorariu_lunar, onorariu_salariat, new_client } = req.body;
-
-    let clientId = client_id;
-
-    // Create new client if provided - NO mandatory fields, save whatever is given
-    if (new_client) {
-        const { denumire, cui, nr_reg_comert, adresa, reprezentant_legal, email, telefon } = new_client;
-        // Only denumire is truly needed to identify the client
-        if (!denumire) {
-            return res.status(400).json({ error: 'Denumirea clientului este obligatorie' });
-        }
-        const result = db.prepare(
-            "INSERT INTO clients (denumire, cui, nr_reg_comert, adresa, reprezentant_legal, email, telefon) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).run(denumire, cui || '', nr_reg_comert || '', adresa || '', reprezentant_legal || '', email || '', telefon || '');
-        clientId = result.lastInsertRowid;
-    }
-
-    if (!clientId) {
-        return res.status(400).json({ error: 'Selectati sau introduceti un client' });
-    }
-
-    // Get client data
-    const client = db.prepare("SELECT * FROM clients WHERE id = ?").get(clientId);
-    if (!client) return res.status(404).json({ error: 'Client negasit' });
-
-    // Get templates
-    const contractTemplate = db.prepare("SELECT * FROM templates WHERE tip = 'contract'").get();
-    const gdprTemplate = db.prepare("SELECT * FROM templates WHERE tip = 'gdpr'").get();
-
-    if (!contractTemplate && !gdprTemplate) {
-        return res.status(400).json({ error: 'Niciun template incarcat. Incarcati mai intai template-urile.' });
-    }
-
-    // Generate contract number
-    const nr_contract = getNextContractNumber(db);
-    const parts = nr_contract.split('/');
-
-    // Prepare data for template - all fields optional, empty string if missing
-    const templateData = {
-        nr_contract_num: parts[0] || '',
-        nr_contract_year: parts[1] || '',
-        nr_contract,
-        data_contract: data_contract || '',
-        denumire: client.denumire || '',
-        cui: client.cui || '',
-        nr_reg_comert: client.nr_reg_comert || '',
-        adresa: client.adresa || '',
-        reprezentant_legal: client.reprezentant_legal || '',
-        email: client.email || '',
-        telefon: client.telefon || '',
-        onorariu_lunar: onorariu_lunar || '',
-        onorariu_salariat: onorariu_salariat || ''
-    };
-
+router.post('/', async (req, res) => {
     try {
+        const db = getDb();
+        const { client_id, data_contract, onorariu_lunar, onorariu_salariat, new_client } = req.body;
+
+        let clientId = client_id;
+
+        if (new_client) {
+            const { denumire, cui, nr_reg_comert, adresa, reprezentant_legal, email, telefon } = new_client;
+            if (!denumire) return res.status(400).json({ error: 'Denumirea clientului este obligatorie' });
+            const result = await db.prepare(
+                "INSERT INTO clients (denumire, cui, nr_reg_comert, adresa, reprezentant_legal, email, telefon) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            ).run(denumire, cui || '', nr_reg_comert || '', adresa || '', reprezentant_legal || '', email || '', telefon || '');
+            clientId = result.lastInsertRowid;
+        }
+
+        if (!clientId) return res.status(400).json({ error: 'Selectati sau introduceti un client' });
+
+        const client = await db.prepare("SELECT * FROM clients WHERE id = ?").get(clientId);
+        if (!client) return res.status(404).json({ error: 'Client negasit' });
+
+        const contractTemplate = await db.prepare("SELECT * FROM templates WHERE tip = 'contract'").get();
+        const gdprTemplate = await db.prepare("SELECT * FROM templates WHERE tip = 'gdpr'").get();
+
+        if (!contractTemplate && !gdprTemplate) {
+            return res.status(400).json({ error: 'Niciun template incarcat. Incarcati mai intai template-urile.' });
+        }
+
+        const nr_contract = await getNextContractNumber(db);
+        const parts = nr_contract.split('/');
+
+        const templateData = {
+            nr_contract_num: parts[0] || '',
+            nr_contract_year: parts[1] || '',
+            nr_contract,
+            data_contract: data_contract || '',
+            denumire: client.denumire || '',
+            cui: client.cui || '',
+            nr_reg_comert: client.nr_reg_comert || '',
+            adresa: client.adresa || '',
+            reprezentant_legal: client.reprezentant_legal || '',
+            email: client.email || '',
+            telefon: client.telefon || '',
+            onorariu_lunar: onorariu_lunar || '',
+            onorariu_salariat: onorariu_salariat || ''
+        };
+
         const result = generateContract(
             contractTemplate ? contractTemplate.filepath : null,
             gdprTemplate ? gdprTemplate.filepath : null,
             templateData
         );
 
-        // Save contract in DB
-        const contractResult = db.prepare(
+        const contractResult = await db.prepare(
             `INSERT INTO contracts (nr_contract, data_contract, client_id, status, onorariu_lunar, onorariu_salariat, fisier_contract, fisier_gdpr)
              VALUES (?, ?, ?, 'pregatit', ?, ?, ?, ?)`
         ).run(
@@ -98,7 +86,6 @@ router.post('/', (req, res) => {
     }
 });
 
-// GET download generated file
 router.get('/download/:filename', (req, res) => {
     const filepath = path.join(GENERATED_DIR, req.params.filename);
     res.download(filepath, req.params.filename, (err) => {
@@ -106,42 +93,37 @@ router.get('/download/:filename', (req, res) => {
     });
 });
 
-// GET download contract + annexa as ZIP
-router.get('/download-zip/:contractId', (req, res) => {
-    const db = getDb();
-    const contract = db.prepare(
-        `SELECT c.*, cl.denumire FROM contracts c JOIN clients cl ON c.client_id = cl.id WHERE c.id = ?`
-    ).get(req.params.contractId);
+router.get('/download-zip/:contractId', async (req, res) => {
+    try {
+        const db = getDb();
+        const contract = await db.prepare(
+            `SELECT c.*, cl.denumire FROM contracts c JOIN clients cl ON c.client_id = cl.id WHERE c.id = ?`
+        ).get(req.params.contractId);
 
-    if (!contract) return res.status(404).json({ error: 'Contract negasit' });
+        if (!contract) return res.status(404).json({ error: 'Contract negasit' });
 
-    const hasContract = contract.fisier_contract && fs.existsSync(path.join(GENERATED_DIR, contract.fisier_contract));
-    const hasGdpr = contract.fisier_gdpr && fs.existsSync(path.join(GENERATED_DIR, contract.fisier_gdpr));
+        const hasContract = contract.fisier_contract && fs.existsSync(path.join(GENERATED_DIR, contract.fisier_contract));
+        const hasGdpr = contract.fisier_gdpr && fs.existsSync(path.join(GENERATED_DIR, contract.fisier_gdpr));
 
-    if (!hasContract && !hasGdpr) {
-        return res.status(404).json({ error: 'Nu exista fisiere generate pentru acest contract. Generati mai intai documentele din pagina Generare Contract.' });
-    }
+        if (!hasContract && !hasGdpr) {
+            return res.status(404).json({ error: 'Nu exista fisiere generate pentru acest contract.' });
+        }
 
-    const zip = new PizZip();
+        const zip = new PizZip();
+        if (hasContract) zip.file(contract.fisier_contract, fs.readFileSync(path.join(GENERATED_DIR, contract.fisier_contract)));
+        if (hasGdpr) zip.file(contract.fisier_gdpr, fs.readFileSync(path.join(GENERATED_DIR, contract.fisier_gdpr)));
 
-    if (hasContract) {
-        zip.file(contract.fisier_contract, fs.readFileSync(path.join(GENERATED_DIR, contract.fisier_contract)));
-    }
-    if (hasGdpr) {
-        zip.file(contract.fisier_gdpr, fs.readFileSync(path.join(GENERATED_DIR, contract.fisier_gdpr)));
-    }
+        const zipBuffer = zip.generate({ type: 'nodebuffer' });
+        const safeName = contract.denumire.replace(/[^a-zA-Z0-9_\-]/g, '_');
+        const safeNr = contract.nr_contract.replace('/', '-');
 
-    const zipBuffer = zip.generate({ type: 'nodebuffer' });
-    const safeName = contract.denumire.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const safeNr = contract.nr_contract.replace('/', '-');
-    const zipFilename = `Contract_Anexa_${safeName}_${safeNr}.zip`;
-
-    res.set({
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${zipFilename}"`,
-        'Content-Length': zipBuffer.length
-    });
-    res.send(zipBuffer);
+        res.set({
+            'Content-Type': 'application/zip',
+            'Content-Disposition': `attachment; filename="Contract_Anexa_${safeName}_${safeNr}.zip"`,
+            'Content-Length': zipBuffer.length
+        });
+        res.send(zipBuffer);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;

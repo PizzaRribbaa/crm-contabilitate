@@ -27,31 +27,28 @@ const upload = multer({
     }
 });
 
-// GET templates
-router.get('/', (req, res) => {
-    const db = getDb();
-    const templates = db.prepare("SELECT * FROM templates ORDER BY tip").all();
-    res.json(templates);
+router.get('/', async (req, res) => {
+    try {
+        const db = getDb();
+        const templates = await db.prepare("SELECT * FROM templates ORDER BY tip").all();
+        res.json(templates);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST upload template
-router.post('/upload', upload.single('file'), (req, res) => {
-    const db = getDb();
-    const { tip } = req.body;
-
-    if (!tip || !['contract', 'gdpr'].includes(tip)) {
-        return res.status(400).json({ error: 'Tip invalid. Folositi: contract sau gdpr' });
-    }
-    if (!req.file) {
-        return res.status(400).json({ error: 'Fisierul lipseste' });
-    }
-
-    db.prepare(
-        `INSERT INTO templates (tip, filename, filepath, uploaded_at) VALUES (?, ?, ?, datetime('now'))
-         ON CONFLICT(tip) DO UPDATE SET filename=excluded.filename, filepath=excluded.filepath, uploaded_at=excluded.uploaded_at`
-    ).run(tip, req.file.originalname, req.file.path);
-
-    res.json({ message: `Template ${tip} incarcat cu succes`, filename: req.file.originalname });
+router.post('/upload', upload.single('file'), async (req, res) => {
+    try {
+        const db = getDb();
+        const { tip } = req.body;
+        if (!tip || !['contract', 'gdpr'].includes(tip)) {
+            return res.status(400).json({ error: 'Tip invalid. Folositi: contract sau gdpr' });
+        }
+        if (!req.file) return res.status(400).json({ error: 'Fisierul lipseste' });
+        await db.prepare(
+            `INSERT INTO templates (tip, filename, filepath) VALUES (?, ?, ?)
+             ON CONFLICT(tip) DO UPDATE SET filename=EXCLUDED.filename, filepath=EXCLUDED.filepath, uploaded_at=NOW()`
+        ).run(tip, req.file.originalname, req.file.path);
+        res.json({ message: `Template ${tip} incarcat cu succes`, filename: req.file.originalname });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;

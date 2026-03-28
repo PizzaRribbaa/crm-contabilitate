@@ -21,6 +21,9 @@
             <a href="/clients.html"><span class="icon">&#128101;</span> Clienti</a>
             <a href="/todo.html"><span class="icon">&#9745;</span> TO DO</a>
         </nav>
+        <div style="padding:12px 20px;margin-top:auto;border-top:1px solid rgba(255,255,255,0.1)">
+            <a href="#" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login.html')" style="color:var(--gray-500);font-size:13px;text-decoration:none">Deconectare</a>
+        </div>
     </aside>
 
     <main class="main">

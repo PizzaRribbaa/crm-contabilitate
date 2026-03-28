@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "sql.js": "^1.10.3",
+    "pg": "^8.13.1",
+    "express-session": "^1.18.1",
     "cors": "^2.8.5",
     "docxtemplater": "^3.40.1",
     "express": "^4.18.2",

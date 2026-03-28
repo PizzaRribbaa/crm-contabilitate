@@ -2,51 +2,57 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../database');
 
-// Get all todos (optionally filter by date range)
-router.get('/todos', (req, res) => {
-    const db = getDb();
-    const rows = db.prepare("SELECT * FROM todos ORDER BY due_date ASC, due_time ASC, done ASC, id DESC").all();
-    res.json(rows);
+router.get('/todos', async (req, res) => {
+    try {
+        const db = getDb();
+        const rows = await db.prepare("SELECT * FROM todos ORDER BY due_date ASC, done ASC, id DESC").all();
+        res.json(rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Create todo
-router.post('/todos', (req, res) => {
-    const db = getDb();
-    const { text, due_date, due_time } = req.body;
-    if (!text || !due_date) return res.status(400).json({ error: 'Text si data sunt obligatorii' });
-    const result = db.prepare("INSERT INTO todos (text, due_date, due_time) VALUES (?, ?, ?)").run(text, due_date, due_time || null);
-    res.json({ id: result.lastInsertRowid, text, due_date, due_time: due_time || null, done: 0 });
+router.post('/todos', async (req, res) => {
+    try {
+        const db = getDb();
+        const { text, due_date } = req.body;
+        if (!text || !due_date) return res.status(400).json({ error: 'Text si data sunt obligatorii' });
+        const result = await db.prepare("INSERT INTO todos (text, due_date) VALUES (?, ?)").run(text, due_date);
+        res.json({ id: result.lastInsertRowid, text, due_date, done: 0 });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Toggle done
-router.put('/todos/:id/toggle', (req, res) => {
-    const db = getDb();
-    const todo = db.prepare("SELECT * FROM todos WHERE id = ?").get(req.params.id);
-    if (!todo) return res.status(404).json({ error: 'Not found' });
-    db.prepare("UPDATE todos SET done = ? WHERE id = ?").run(todo.done ? 0 : 1, req.params.id);
-    res.json({ ...todo, done: todo.done ? 0 : 1 });
+router.put('/todos/:id/toggle', async (req, res) => {
+    try {
+        const db = getDb();
+        const todo = await db.prepare("SELECT * FROM todos WHERE id = ?").get(req.params.id);
+        if (!todo) return res.status(404).json({ error: 'Not found' });
+        await db.prepare("UPDATE todos SET done = ? WHERE id = ?").run(todo.done ? 0 : 1, req.params.id);
+        res.json({ ...todo, done: todo.done ? 0 : 1 });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Update todo
-router.put('/todos/:id', (req, res) => {
-    const db = getDb();
-    const { text, due_date, due_time } = req.body;
-    db.prepare("UPDATE todos SET text = ?, due_date = ?, due_time = ? WHERE id = ?").run(text, due_date, due_time || null, req.params.id);
-    res.json({ success: true });
+router.put('/todos/:id', async (req, res) => {
+    try {
+        const db = getDb();
+        const { text, due_date } = req.body;
+        await db.prepare("UPDATE todos SET text = ?, due_date = ? WHERE id = ?").run(text, due_date, req.params.id);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Delete todo
-router.delete('/todos/:id', (req, res) => {
-    const db = getDb();
-    db.prepare("DELETE FROM todos WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
+router.delete('/todos/:id', async (req, res) => {
+    try {
+        const db = getDb();
+        await db.prepare("DELETE FROM todos WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Delete all done todos
-router.delete('/todos-done', (req, res) => {
-    const db = getDb();
-    db.prepare("DELETE FROM todos WHERE done = 1").run();
-    res.json({ success: true });
+router.delete('/todos-done', async (req, res) => {
+    try {
+        const db = getDb();
+        await db.prepare("DELETE FROM todos WHERE done = 1").run();
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
