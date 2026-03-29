@@ -71,6 +71,16 @@ async function initDb() {
             INSERT INTO settings (key, value) VALUES ('contract_seq_year', '2026') ON CONFLICT (key) DO NOTHING;
             INSERT INTO settings (key, value) VALUES ('contract_seq_num', '0') ON CONFLICT (key) DO NOTHING;
         `);
+        // Migrations for PostgreSQL
+        try {
+            await pool.query("SELECT filedata FROM templates LIMIT 1");
+        } catch(e) {
+            await pool.query("ALTER TABLE templates ADD COLUMN filedata BYTEA");
+            console.log('PG Migration: added filedata column to templates');
+        }
+        try {
+            await pool.query("ALTER TABLE templates ALTER COLUMN filepath DROP NOT NULL");
+        } catch(e) { /* already nullable */ }
         return;
     }
 
@@ -173,7 +183,7 @@ function getDb() {
                 async run(...params) {
                     const returningSql = finalSql.trimEnd().replace(/;$/, '');
                     let result;
-                    if (returningSql.toUpperCase().startsWith('INSERT')) {
+                    if (returningSql.toUpperCase().startsWith('INSERT') && !returningSql.toUpperCase().includes('RETURNING')) {
                         result = await pool.query(returningSql + ' RETURNING id', params);
                     } else {
                         result = await pool.query(finalSql, params);
