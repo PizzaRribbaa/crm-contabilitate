@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tip TEXT NOT NULL UNIQUE,
     filename TEXT NOT NULL,
-    filepath TEXT NOT NULL,
+    filepath TEXT,
+    filedata BLOB,
     uploaded_at TEXT DEFAULT (datetime('now'))
 );
 

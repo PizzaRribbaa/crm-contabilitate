@@ -6,17 +6,19 @@ const GENERATED_DIR = path.join(__dirname, '..', '..', 'generated');
 
 /**
  * Genereaza un DOCX completat cu datele clientului.
- * Lucreaza direct pe XML, inlocuind {placeholder} cu valorile reale.
- * Unde nu exista date, lasa spatiu gol.
+ * Accepta templateBuffer (Buffer din DB) sau templatePath (fisier pe disc).
  */
-function generateDocx(templatePath, data, outputFilename) {
-    const content = fs.readFileSync(templatePath, 'binary');
+function generateDocx(templateSource, data, outputFilename) {
+    let content;
+    if (Buffer.isBuffer(templateSource)) {
+        content = templateSource;
+    } else {
+        content = fs.readFileSync(templateSource, 'binary');
+    }
     const zip = new PizZip(content);
 
     let xml = zip.file('word/document.xml').asText();
 
-    // Replace all {placeholder} patterns with actual data
-    // If data is missing/empty, replace with empty string (no underscores)
     const placeholders = {
         '{nr_contract_num}': data.nr_contract_num || '',
         '{nr_contract_year}': data.nr_contract_year || '',
@@ -33,7 +35,6 @@ function generateDocx(templatePath, data, outputFilename) {
     };
 
     for (const [placeholder, value] of Object.entries(placeholders)) {
-        // Replace all occurrences
         while (xml.includes(placeholder)) {
             xml = xml.replace(placeholder, escapeXml(value.toString()));
         }
@@ -60,21 +61,21 @@ function escapeXml(str) {
         .replace(/'/g, '&apos;');
 }
 
-function generateContract(contractTemplatePath, gdprTemplatePath, data) {
+function generateContract(contractSource, gdprSource, data) {
     const safeName = (data.denumire || 'client').replace(/[^a-zA-Z0-9\u00C0-\u024F ]/g, '').replace(/\s+/g, '_');
     const safeNr = (data.nr_contract_num + '-' + data.nr_contract_year) || 'draft';
 
     const results = {};
 
-    if (contractTemplatePath) {
+    if (contractSource) {
         const contractFilename = `Contract_${safeName}_${safeNr}.docx`;
-        results.contractPath = generateDocx(contractTemplatePath, data, contractFilename);
+        results.contractPath = generateDocx(contractSource, data, contractFilename);
         results.contractFilename = contractFilename;
     }
 
-    if (gdprTemplatePath) {
+    if (gdprSource) {
         const gdprFilename = `Anexa_GDPR_${safeName}_${safeNr}.docx`;
-        results.gdprPath = generateDocx(gdprTemplatePath, data, gdprFilename);
+        results.gdprPath = generateDocx(gdprSource, data, gdprFilename);
         results.gdprFilename = gdprFilename;
     }
 

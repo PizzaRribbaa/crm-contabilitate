@@ -37,6 +37,14 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Niciun template incarcat. Incarcati mai intai template-urile.' });
         }
 
+        // Get template source: prefer filedata (DB), fallback to filepath (disk)
+        function getTemplateSource(tpl) {
+            if (!tpl) return null;
+            if (tpl.filedata) return Buffer.isBuffer(tpl.filedata) ? tpl.filedata : Buffer.from(tpl.filedata);
+            if (tpl.filepath) return tpl.filepath;
+            return null;
+        }
+
         const nr_contract = await getNextContractNumber(db);
         const parts = nr_contract.split('/');
 
@@ -57,8 +65,8 @@ router.post('/', async (req, res) => {
         };
 
         const result = generateContract(
-            contractTemplate ? contractTemplate.filepath : null,
-            gdprTemplate ? gdprTemplate.filepath : null,
+            getTemplateSource(contractTemplate),
+            getTemplateSource(gdprTemplate),
             templateData
         );
 

@@ -74,6 +74,24 @@ async function start() {
             db.exec("ALTER TABLE todos ADD COLUMN due_time TEXT");
             console.log('Migration: added due_time column to todos');
         }
+
+        try {
+            await db.prepare("SELECT filedata FROM templates LIMIT 1").get();
+        } catch (e) {
+            db.exec("ALTER TABLE templates ADD COLUMN filedata BLOB");
+            console.log('Migration: added filedata column to templates');
+        }
+
+        // Migrate existing file-based templates to DB
+        const templates = db.prepare("SELECT * FROM templates WHERE filedata IS NULL AND filepath IS NOT NULL").all();
+        const fsMig = require('fs');
+        templates.forEach(t => {
+            if (fsMig.existsSync(t.filepath)) {
+                const buf = fsMig.readFileSync(t.filepath);
+                db.prepare("UPDATE templates SET filedata = ? WHERE id = ?").run(buf, t.id);
+                console.log(`Migration: loaded ${t.tip} template into DB`);
+            }
+        });
     }
 
     // Routes

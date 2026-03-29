@@ -53,7 +53,8 @@ async function initDb() {
                 id SERIAL PRIMARY KEY,
                 tip TEXT NOT NULL UNIQUE,
                 filename TEXT NOT NULL,
-                filepath TEXT NOT NULL,
+                filepath TEXT,
+                filedata BYTEA,
                 uploaded_at TIMESTAMP DEFAULT NOW()
             );
             CREATE TABLE IF NOT EXISTS settings (
