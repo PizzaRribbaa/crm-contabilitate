@@ -10,6 +10,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+}
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -20,11 +23,10 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production' && process.env.DATABASE_URL ? true : false,
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000 // 24 ore
-    },
-    ...(process.env.NODE_ENV === 'production' ? { proxy: true } : {})
+    }
 }));
 
 // Login/Logout API (before auth middleware)
