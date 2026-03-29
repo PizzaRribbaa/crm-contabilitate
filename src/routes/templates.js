@@ -45,7 +45,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'Fisierul lipseste' });
         await db.prepare(
             `INSERT INTO templates (tip, filename, filepath) VALUES (?, ?, ?)
-             ON CONFLICT(tip) DO UPDATE SET filename=EXCLUDED.filename, filepath=EXCLUDED.filepath, uploaded_at=NOW()`
+             ON CONFLICT(tip) DO UPDATE SET filename=EXCLUDED.filename, filepath=EXCLUDED.filepath, uploaded_at=datetime('now')`
         ).run(tip, req.file.originalname, req.file.path);
         res.json({ message: `Template ${tip} incarcat cu succes`, filename: req.file.originalname });
     } catch(e) { res.status(500).json({ error: e.message }); }

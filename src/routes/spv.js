@@ -35,7 +35,7 @@ router.put('/:id', async (req, res) => {
         const db = getDb();
         const { client_id, acces_spv, acces_150, observatii } = req.body;
         await db.prepare(
-            `UPDATE spv_access SET client_id=?, acces_spv=?, acces_150=?, observatii=?, updated_at=NOW() WHERE id=?`
+            `UPDATE spv_access SET client_id=?, acces_spv=?, acces_150=?, observatii=?, updated_at=datetime('now') WHERE id=?`
         ).run(client_id, acces_spv ? 1 : 0, acces_150 ? 1 : 0, observatii || null, req.params.id);
         res.json({ message: 'Acces actualizat' });
     } catch(e) { res.status(500).json({ error: e.message }); }

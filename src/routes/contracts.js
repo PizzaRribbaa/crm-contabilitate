@@ -162,7 +162,7 @@ router.put('/contracts/:id', async (req, res) => {
         const db = getDb();
         const { data_contract, status, onorariu_lunar, onorariu_salariat, observatii } = req.body;
         await db.prepare(
-            `UPDATE contracts SET data_contract=?, status=?, onorariu_lunar=?, onorariu_salariat=?, observatii=?, updated_at=NOW() WHERE id=?`
+            `UPDATE contracts SET data_contract=?, status=?, onorariu_lunar=?, onorariu_salariat=?, observatii=?, updated_at=datetime('now') WHERE id=?`
         ).run(data_contract, status, onorariu_lunar || null, onorariu_salariat || 50, observatii || null, req.params.id);
         res.json({ message: 'Contract actualizat' });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -183,7 +183,7 @@ router.post('/contracts/:id/upload', (req, res) => {
                 const oldPath = path.join(UPLOADS_DIR, contract.fisier_contract_uploaded);
                 if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
             }
-            await db.prepare("UPDATE contracts SET fisier_contract_uploaded = ?, updated_at = NOW() WHERE id = ?")
+            await db.prepare("UPDATE contracts SET fisier_contract_uploaded = ?, updated_at = datetime('now') WHERE id = ?")
                 .run(req.file.filename, req.params.id);
             res.json({ message: 'Contract incarcat cu succes', filename: req.file.filename });
         } catch(e) { res.status(500).json({ error: e.message }); }
