@@ -1,9 +1,8 @@
 node_modules/
 db/*.sqlite
 db/*.db
-uploads/*
-!uploads/template_contract.docx
-!uploads/template_gdpr.docx
+uploads/
 generated/
 .env
 .claude/
+*.docx
